@@ -1,0 +1,32 @@
+{
+  "name": "aluminio-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "vite",
+    "test": "node --test --experimental-strip-types src/calculos/calculos.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "npm test && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5"
+  }
+}
