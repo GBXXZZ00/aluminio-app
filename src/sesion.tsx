@@ -1,10 +1,12 @@
 // Estado de la sesión: quién entró, a qué herrería, y su tema.
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, type Sesion, type Slug, type Tema } from './datos/index.ts';
 
 interface Ctx {
   sesion: Sesion | null;
   cargando: boolean;
+  /** Mensaje si no se pudo verificar la sesión por falta de internet. */
+  sinConexion: string | null;
   entrar: (slug: Slug, usuario: string, clave: string) => Promise<void>;
   salir: () => Promise<void>;
   refrescar: () => Promise<void>;
@@ -35,12 +37,16 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState<Sesion | null>(null);
   const [cargando, setCargando] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [sinConexion, setSinConexion] = useState<string | null>(null);
+  const reloj = useRef<number | undefined>(undefined);
 
   const refrescar = useCallback(async () => {
     try {
       setSesion(await api.sesionActual());
-    } catch {
-      setSesion(null);
+      setSinConexion(null);
+    } catch (e) {
+      // Sin internet: NO se cierra la sesión, se ofrece reintentar.
+      setSinConexion((e as Error).message);
     }
   }, []);
 
@@ -48,18 +54,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     refrescar().finally(() => setCargando(false));
   }, [refrescar]);
 
+  // Si la sesión se cierra sola (clave cambiada, usuario desactivado), volver al inicio.
+  useEffect(() => api.escucharSalida(() => setSesion(null)), []);
+
   useEffect(() => {
     aplicarApariencia(sesion?.perfil.tema ?? temaGuardado(), sesion?.herreria.slug ?? null);
   }, [sesion]);
 
   const avisar = useCallback((m: string) => {
     setToast(m);
-    window.setTimeout(() => setToast(null), 2600);
+    window.clearTimeout(reloj.current);
+    reloj.current = window.setTimeout(() => setToast(null), 2600);
   }, []);
 
   const valor: Ctx = {
     sesion,
     cargando,
+    sinConexion,
     refrescar,
     avisar,
     async entrar(slug, usuario, clave) {

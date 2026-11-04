@@ -62,6 +62,7 @@ export function Finanzas() {
   const [desc, setDesc] = useState('');
   const [monto, setMonto] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [agregando, setAgregando] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -78,6 +79,8 @@ export function Finanzas() {
   async function agregar() {
     if (!desc.trim()) return setError('Escribe una descripción del pago.');
     if (!(monto > 0)) return setError('Escribe un monto mayor que cero.');
+    if (agregando) return;
+    setAgregando(true);
     try {
       await api.agregarManoObra(desc, monto);
       setDesc('');
@@ -86,6 +89,8 @@ export function Finanzas() {
       await cargar();
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setAgregando(false);
     }
   }
 
@@ -135,10 +140,10 @@ export function Finanzas() {
                 </div>
                 <div className="campo">
                   <label htmlFor="mo-monto">Monto $</label>
-                  <CampoNumero id="mo-monto" valor={monto} onCambio={setMonto} />
+                  <CampoNumero id="mo-monto" dinero valor={monto} onCambio={setMonto} />
                 </div>
               </div>
-              <button type="button" className="btn secundario" onClick={agregar}><Mas /> Agregar pago</button>
+              <button type="button" className="btn secundario" disabled={agregando} onClick={agregar}><Mas /> {agregando ? 'Guardando…' : 'Agregar pago'}</button>
             </div>
           </div>
 
@@ -156,7 +161,7 @@ export function Finanzas() {
 }
 
 export function CierreGeneral() {
-  const { sesion } = useSesion();
+  const { sesion, avisar } = useSesion();
   const nav = useNavigate();
   const [r, setR] = useState<Resumen | null>(null);
   const [clave, setClave] = useState('');
@@ -177,7 +182,8 @@ export function CierreGeneral() {
       if (!res.ok) {
         setError(res.error ?? 'No se pudo cerrar.');
       } else {
-        setHecho({ numero: res.numero ?? 0, r: r! });
+        // Se muestra el resumen EXACTO que quedó archivado en el servidor.
+        setHecho({ numero: res.numero ?? 0, r: res.resumen ?? r! });
         setClave('');
       }
     } catch (e) {
@@ -195,7 +201,7 @@ export function CierreGeneral() {
         <div className="aviso ok">Los lotes quedaron archivados. Finanzas empieza de cero con los lotes nuevos.</div>
         <TablaResumen r={hecho.r} />
         <div className="dos">
-          <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').then((m) => m.pdfCierre(hecho.numero, sesion.herreria.nombre, new Date(), hecho.r))}>Descargar PDF</button>
+          <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').catch(() => null).then((m) => m ? m.pdfCierre(hecho.numero, sesion.herreria.nombre, new Date(), hecho.r) : avisar('No se pudo crear el PDF. Recarga la app e inténtalo de nuevo.'))}>Descargar PDF</button>
           <a className="btn whatsapp" style={{ minHeight: 52, fontSize: 16 }} href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer"><Chat /> WhatsApp</a>
         </div>
         <button type="button" className="btn primario" onClick={() => nav('/lotes', { replace: true })}>Volver a los lotes</button>
@@ -273,7 +279,7 @@ function textoCierre(numero: number, herreria: string, r: Resumen): string {
 }
 
 export function Cierres() {
-  const { sesion } = useSesion();
+  const { sesion, avisar } = useSesion();
   const [lista, setLista] = useState<Cierre[] | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -299,7 +305,7 @@ export function Cierres() {
             <div className="pila" style={{ padding: 12 }}>
               <TablaResumen r={c.detalle} />
               <TablaLotes r={c.detalle} />
-              <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').then((m) => m.pdfCierre(c.numero, sesion.herreria.nombre, new Date(c.realizado_en), c.detalle))}>Descargar PDF</button>
+              <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').catch(() => null).then((m) => m ? m.pdfCierre(c.numero, sesion.herreria.nombre, new Date(c.realizado_en), c.detalle) : avisar('No se pudo crear el PDF. Recarga la app e inténtalo de nuevo.'))}>Descargar PDF</button>
             </div>
           )}
         </div>

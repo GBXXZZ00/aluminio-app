@@ -19,7 +19,8 @@ export function acomodarEnBarras(
   largo: number = LARGO_BARRA_CM,
 ): Barra[] {
   const L = aU(largo);
-  const D = aU(disco);
+  // Disco inválido (vacío, negativo o absurdo) → se usa el valor normal.
+  const D = aU(Number.isFinite(disco) && disco >= 0 && disco <= 2 ? disco : DISCO_CM_DEFECTO);
   const ordenadas = [...medidas].map(aU).sort((a, b) => b - a);
   const barras: { piezas: number[]; usado: number }[] = [];
 

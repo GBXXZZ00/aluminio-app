@@ -12,10 +12,11 @@ const LLAVE = import.meta.env.VITE_SUPABASE_KEY || 'sb_publishable_96jzw5X6qX4eE
 const DOMINIO_INTERNO = 'aluminio.local';
 
 const ERROR_LOGIN = 'Usuario o clave incorrectos';
+const NO_GUARDADO = 'No se guardó: el lote ya fue cerrado o no tienes permiso. Vuelve atrás y revisa.';
 
 function falla(e: { message?: string } | null | undefined, porDefecto = 'Algo salió mal. Revisa tu conexión e inténtalo de nuevo.'): never {
   const m = e?.message ?? '';
-  if (/Failed to fetch|NetworkError|network/i.test(m)) throw new Error('Sin conexión a internet.');
+  if (/Failed to fetch|NetworkError|network|Load failed/i.test(m)) throw new Error('Sin conexión a internet.');
   if (/row-level security|permission denied/i.test(m)) throw new Error('No tienes permiso para hacer esto.');
   throw new Error(m && /[áéíóúñ¿]|^[A-ZÁÉÍÓÚ][a-záéíóú]+ /.test(m) ? m : porDefecto);
 }
@@ -84,8 +85,10 @@ export function crearApiSupabase(): Api {
     const { data } = await sb.auth.getSession();
     const uid = data.session?.user.id;
     if (!uid) return null;
-    const { data: perfil } = await sb.from('perfiles').select('*').eq('id', uid).maybeSingle();
-    const { data: herreria } = await sb.from('herrerias').select('id, slug, nombre').maybeSingle();
+    const { data: perfil, error: e1 } = await sb.from('perfiles').select('*').eq('id', uid).maybeSingle();
+    const { data: herreria, error: e2 } = await sb.from('herrerias').select('id, slug, nombre').maybeSingle();
+    // Un fallo de red NO es lo mismo que "no hay sesión": se avisa para reintentar.
+    if (e1 || e2) throw new Error('Sin conexión. Revisa tu internet e inténtalo de nuevo.');
     if (!perfil || !herreria || !perfil.activo) return null;
     return { perfil: perfil as Perfil, herreria: { ...herreria, id: n(herreria.id) } as Sesion['herreria'] };
   }
@@ -115,14 +118,22 @@ export function crearApiSupabase(): Api {
       }
       const s = await cargarSesion();
       if (!s || s.herreria.slug !== slug) {
-        await sb.auth.signOut();
+        await sb.auth.signOut({ scope: 'local' });
         throw new Error(ERROR_LOGIN);
       }
       return s;
     },
 
     async cerrarSesion() {
-      await sb.auth.signOut();
+      // "local" borra la sesión del teléfono aunque no haya internet.
+      await sb.auth.signOut({ scope: 'local' });
+    },
+
+    escucharSalida(alSalir) {
+      const { data } = sb.auth.onAuthStateChange((evento) => {
+        if (evento === 'SIGNED_OUT') alSalir();
+      });
+      return () => data.subscription.unsubscribe();
     },
 
     sesionActual: cargarSesion,
@@ -172,14 +183,15 @@ export function crearApiSupabase(): Api {
         .maybeSingle();
       if (error) falla(error);
       if (!lote) throw new Error('Este lote no existe o fue eliminado.');
-      const { data: v, error: e2 } = await sb.from('ventanas').select('*').eq('lote_id', id).order('orden');
+      const { data: v, error: e2 } = await sb.from('ventanas').select('*').eq('lote_id', id).order('orden').order('creado_en');
       if (e2) falla(e2);
       return { lote: aLote(lote), ventanas: (v ?? []).map(aVentana) };
     },
 
     async actualizarLote(id, cambios) {
-      const { error } = await sb.from('lotes').update(cambios).eq('id', id);
+      const { data, error } = await sb.from('lotes').update(cambios).eq('id', id).select('id');
       if (error) falla(error);
+      if (!data?.length) throw new Error(NO_GUARDADO);
     },
 
     async borrarLote(id) {
@@ -204,8 +216,9 @@ export function crearApiSupabase(): Api {
     async guardarVentana(loteId, v) {
       const { id, ...datos } = v;
       if (id) {
-        const { error } = await sb.from('ventanas').update(datos).eq('id', id);
+        const { data: act, error } = await sb.from('ventanas').update(datos).eq('id', id).select('id');
         if (error) falla(error);
+        if (!act?.length) throw new Error(NO_GUARDADO);
         return;
       }
       const { data: ult } = await sb
@@ -220,8 +233,9 @@ export function crearApiSupabase(): Api {
     },
 
     async borrarVentana(id) {
-      const { error } = await sb.from('ventanas').delete().eq('id', id);
+      const { data, error } = await sb.from('ventanas').delete().eq('id', id).select('id');
       if (error) falla(error);
+      if (!data?.length) throw new Error(NO_GUARDADO);
     },
 
     async obtenerGastos(loteId): Promise<Gastos> {
@@ -261,13 +275,16 @@ export function crearApiSupabase(): Api {
     },
 
     async agregarManoObra(descripcion, monto) {
-      const { error } = await sb.from('mano_obra').insert({ descripcion: descripcion.trim(), monto });
+      const hoy = new Date();
+      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+      const { error } = await sb.from('mano_obra').insert({ descripcion: descripcion.trim(), monto, fecha });
       if (error) falla(error);
     },
 
     async borrarManoObra(id) {
-      const { error } = await sb.from('mano_obra').delete().eq('id', id);
+      const { data, error } = await sb.from('mano_obra').delete().eq('id', id).select('id');
       if (error) falla(error);
+      if (!data?.length) throw new Error(NO_GUARDADO);
     },
 
     async tieneClaveCierre() {
@@ -284,8 +301,8 @@ export function crearApiSupabase(): Api {
     async cerrarPeriodo(clave) {
       const { data, error } = await sb.rpc('cerrar_periodo', { clave });
       if (error) falla(error);
-      const r = data as { ok: boolean; error?: string; numero?: number };
-      return r;
+      const r = data as { ok: boolean; error?: string; numero?: number; resumen?: Record<string, unknown> };
+      return { ok: r.ok, error: r.error, numero: r.numero, resumen: r.resumen ? aResumen(r.resumen) : undefined };
     },
 
     async listarCierres(): Promise<Cierre[]> {

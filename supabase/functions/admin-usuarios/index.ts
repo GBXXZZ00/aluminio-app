@@ -51,9 +51,20 @@ Deno.serve(async (req) => {
 
   let cuerpo: Record<string, unknown>;
   try {
-    cuerpo = await req.json();
+    const leido = await req.json();
+    if (!leido || typeof leido !== 'object' || Array.isArray(leido)) return error('Datos inválidos');
+    cuerpo = leido as Record<string, unknown>;
   } catch {
     return error('Datos inválidos');
+  }
+
+  // Quien puede hacer el cierre también necesita ver Finanzas.
+  const permisoCierre = cuerpo.puede_cierre === true;
+  const permisoFinanzas = cuerpo.puede_finanzas === true || permisoCierre;
+
+  async function cerrarSesiones(id: string) {
+    const { error: e } = await admin.rpc('cerrar_sesiones_usuario', { uid: id });
+    if (e) console.error('cerrar_sesiones_usuario', e.message);
   }
   const accion = String(cuerpo.accion ?? '');
 
@@ -94,7 +105,10 @@ Deno.serve(async (req) => {
       email_confirm: true,
       app_metadata: { herreria: herreria.slug },
     });
-    if (errCrear || !creado?.user) return error('No se pudo crear el usuario: ' + (errCrear?.message ?? ''), 500);
+    if (errCrear || !creado?.user) {
+      console.error('createUser', errCrear?.message);
+      return error('No se pudo crear el usuario. Inténtalo de nuevo.', 500);
+    }
 
     const { error: errPerfil } = await admin.from('perfiles').insert({
       id: creado.user.id,
@@ -103,13 +117,14 @@ Deno.serve(async (req) => {
       nombre,
       es_admin: false,
       activo: true,
-      puede_finanzas: cuerpo.puede_finanzas === true,
-      puede_cierre: cuerpo.puede_cierre === true,
+      puede_finanzas: permisoFinanzas,
+      puede_cierre: permisoCierre,
       debe_cambiar_clave: true,
     });
     if (errPerfil) {
       await admin.auth.admin.deleteUser(creado.user.id);
-      return error('No se pudo guardar el usuario: ' + errPerfil.message, 500);
+      console.error('perfil', errPerfil.message);
+      return error('No se pudo guardar el usuario. Inténtalo de nuevo.', 500);
     }
     return responder({ ok: true, id: creado.user.id });
   }
@@ -125,20 +140,32 @@ Deno.serve(async (req) => {
       if (!n || n.length > 60) return error('Nombre inválido.');
       cambios.nombre = n;
     }
-    if (typeof cuerpo.puede_finanzas === 'boolean') cambios.puede_finanzas = cuerpo.puede_finanzas;
-    if (typeof cuerpo.puede_cierre === 'boolean') cambios.puede_cierre = cuerpo.puede_cierre;
+    if (typeof cuerpo.puede_finanzas === 'boolean' || typeof cuerpo.puede_cierre === 'boolean') {
+      cambios.puede_finanzas = permisoFinanzas;
+      cambios.puede_cierre = permisoCierre;
+    }
     if (typeof cuerpo.activo === 'boolean') cambios.activo = cuerpo.activo;
     if (!Object.keys(cambios).length) return error('No hay cambios.');
 
-    if (typeof cuerpo.activo === 'boolean') {
-      // Inactivo = además se le cierra la sesión y no puede volver a entrar.
+    // Primero el perfil (lo que ve la app); luego el bloqueo de la cuenta.
+    const { data: antes } = await admin.from('perfiles').select('activo').eq('id', objetivo.id).single();
+    const { error: errAct } = await admin.from('perfiles').update(cambios).eq('id', objetivo.id);
+    if (errAct) {
+      console.error('perfil', errAct.message);
+      return error('No se pudo guardar. Inténtalo de nuevo.', 500);
+    }
+    if (typeof cuerpo.activo === 'boolean' && cuerpo.activo !== antes?.activo) {
+      // Inactivo = no puede volver a entrar y se cierran sus sesiones abiertas.
       const { error: errBan } = await admin.auth.admin.updateUserById(objetivo.id, {
         ban_duration: cuerpo.activo ? 'none' : BLOQUEO_INDEFINIDO,
       });
-      if (errBan) return error('No se pudo cambiar el estado: ' + errBan.message, 500);
+      if (errBan) {
+        console.error('ban', errBan.message);
+        await admin.from('perfiles').update({ activo: antes?.activo ?? true }).eq('id', objetivo.id);
+        return error('No se pudo cambiar el estado. Inténtalo de nuevo.', 500);
+      }
+      if (!cuerpo.activo) await cerrarSesiones(objetivo.id);
     }
-    const { error: errAct } = await admin.from('perfiles').update(cambios).eq('id', objetivo.id);
-    if (errAct) return error('No se pudo guardar: ' + errAct.message, 500);
     return responder({ ok: true });
   }
 
@@ -149,8 +176,14 @@ Deno.serve(async (req) => {
     const clave = String(cuerpo.clave ?? '');
     if (clave.length < 6) return error('La clave debe tener al menos 6 caracteres.');
     const { error: errClave } = await admin.auth.admin.updateUserById(objetivo.id, { password: clave });
-    if (errClave) return error('No se pudo cambiar la clave: ' + errClave.message, 500);
-    await admin.from('perfiles').update({ debe_cambiar_clave: true }).eq('id', objetivo.id);
+    if (errClave) {
+      console.error('clave', errClave.message);
+      return error('No se pudo cambiar la clave. Usa otra clave más difícil.', 500);
+    }
+    const { error: errMarca } = await admin.from('perfiles').update({ debe_cambiar_clave: true }).eq('id', objetivo.id);
+    if (errMarca) console.error('debe_cambiar_clave', errMarca.message);
+    // Un teléfono perdido con la sesión abierta deja de tener acceso.
+    await cerrarSesiones(objetivo.id);
     return responder({ ok: true });
   }
 

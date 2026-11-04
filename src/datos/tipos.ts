@@ -126,6 +126,8 @@ export interface Sesion {
 export interface Api {
   iniciarSesion(slug: Slug, usuario: string, clave: string): Promise<Sesion>;
   cerrarSesion(): Promise<void>;
+  /** Avisa si la sesión se cierra sola (clave cambiada, usuario desactivado…). */
+  escucharSalida(alSalir: () => void): () => void;
   sesionActual(): Promise<Sesion | null>;
   cambiarMiClave(nueva: string): Promise<void>;
   guardarTema(tema: Tema): Promise<void>;
@@ -148,7 +150,7 @@ export interface Api {
   borrarManoObra(id: string): Promise<void>;
   tieneClaveCierre(): Promise<boolean>;
   establecerClaveCierre(clave: string): Promise<void>;
-  cerrarPeriodo(clave: string): Promise<{ ok: boolean; error?: string; numero?: number }>;
+  cerrarPeriodo(clave: string): Promise<{ ok: boolean; error?: string; numero?: number; resumen?: Resumen }>;
   listarCierres(): Promise<Cierre[]>;
 
   listarUsuarios(): Promise<Perfil[]>;

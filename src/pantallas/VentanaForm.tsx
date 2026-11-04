@@ -161,12 +161,12 @@ export function VentanaForm() {
         <span className="etiqueta-seccion">Precio de venta</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <label htmlFor="precio-unit" style={{ flex: 1, color: 'var(--texto-2)' }}>Precio unitario $</label>
-          <CampoNumero id="precio-unit" valor={unitario} style={{ width: 150, fontSize: 20, fontWeight: 600 }}
+          <CampoNumero id="precio-unit" dinero maximo={1_000_000} valor={unitario} style={{ width: 150, fontSize: 20, fontWeight: 600 }}
             onCambio={(n) => { setPrecioManual(true); setUnitario(n); setTotal(totalDesdeUnitario(n, cantidad)); }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: '1px solid var(--borde)' }}>
           <label htmlFor="precio-total" style={{ flex: 1, fontWeight: 600 }}>Total · {cantidad} {cantidad === 1 ? 'ventana' : 'ventanas'} $</label>
-          <CampoNumero id="precio-total" valor={total} style={{ width: 150, fontSize: 24, fontWeight: 600, color: 'var(--acento)', borderColor: 'var(--acento)' }}
+          <CampoNumero id="precio-total" dinero maximo={9_000_000} valor={total} style={{ width: 150, fontSize: 24, fontWeight: 600, color: 'var(--acento)', borderColor: 'var(--acento)' }}
             onCambio={(n) => { setPrecioManual(true); setTotal(n); setUnitario(unitarioDesdeTotal(n, cantidad)); }} />
         </div>
         <span className="ayuda">El precio se propone solo según el área. Puedes cambiar el unitario o el total y el otro se ajusta.</span>

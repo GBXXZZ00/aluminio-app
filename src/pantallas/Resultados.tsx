@@ -210,7 +210,7 @@ export function Resultados() {
           </a>
           <div className="dos">
             <button type="button" className="btn secundario" onClick={copiar}>Copiar texto</button>
-            <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').then((m) => m.pdfLote(lote.numero, fecha, sesion.herreria.nombre, lote.cliente, r))}>Descargar PDF</button>
+            <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').then((m) => m.pdfLote(lote.numero, fecha, sesion.herreria.nombre, lote.cliente, r)).catch(() => avisar('No se pudo crear el PDF. Recarga la app e inténtalo de nuevo.'))}>Descargar PDF</button>
           </div>
           <span className="sec" style={{ fontSize: 13 }}>Vista previa del mensaje</span>
           <div className="burbuja">{mensaje}</div>

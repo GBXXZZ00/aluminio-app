@@ -24,8 +24,16 @@ function Protegida({ children, requiere }: { children: ReactNode; requiere?: Req
 }
 
 function Rutas() {
-  const { cargando } = useSesion();
+  const { cargando, sinConexion, refrescar } = useSesion();
   if (cargando) return <main className="pantalla"><Cargando /></main>;
+  if (sinConexion) {
+    return (
+      <main className="pantalla" style={{ minHeight: '100dvh', justifyContent: 'center' }}>
+        <div className="aviso error" role="alert">{sinConexion}</div>
+        <button type="button" className="btn primario" onClick={() => refrescar()}>Reintentar</button>
+      </main>
+    );
+  }
   return (
     <Routes>
       <Route path="/" element={<Inicio />} />

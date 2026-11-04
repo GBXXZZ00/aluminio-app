@@ -18,6 +18,7 @@ export function Historial() {
   const [cliente, setCliente] = useState('');
   const [creando, setCreando] = useState(false);
   const [borrar, setBorrar] = useState<Lote | null>(null);
+  const [ocupado, setOcupado] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -45,12 +46,16 @@ export function Historial() {
 
   async function duplicar(l: Lote) {
     setMenu(null);
+    if (ocupado) return;
+    setOcupado(true);
     try {
       const n = await api.duplicarLote(l.id);
       avisar(`Lote ${fmtLote(l.numero)} duplicado como ${fmtLote(n.numero)}`);
       await cargar();
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setOcupado(false);
     }
   }
 

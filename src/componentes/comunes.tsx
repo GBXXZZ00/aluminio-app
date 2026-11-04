@@ -2,6 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Atras } from './iconos.tsx';
+import { leerNumero } from '../calculos/index.ts';
 
 export function Encabezado({ titulo, sub, volver, derecha }: { titulo: ReactNode; sub?: ReactNode; volver?: string | -1; derecha?: ReactNode }) {
   const nav = useNavigate();
@@ -62,8 +63,10 @@ export function Modal({ titulo, onCerrar, children }: { titulo: string; onCerrar
 }
 
 /** Campo de número que acepta coma o punto y no se vuelve loco al escribir. */
-export function CampoNumero({ id, valor, onCambio, grande, decimales = 2, ...resto }: {
+export function CampoNumero({ id, valor, onCambio, grande, decimales = 2, dinero = false, maximo = 9_999_999, ...resto }: {
   id: string; valor: number; onCambio: (n: number) => void; grande?: boolean; decimales?: number;
+  /** Campos de dinero: entienden separadores de miles ("1,500" = 1500). */
+  dinero?: boolean; maximo?: number;
   disabled?: boolean; 'aria-label'?: string; style?: React.CSSProperties; onBlur?: () => void;
 }) {
   const [texto, setTexto] = useState(fmtEntrada(valor, decimales));
@@ -81,11 +84,13 @@ export function CampoNumero({ id, valor, onCambio, grande, decimales = 2, ...res
       onFocus={(e) => { setEnfocado(true); e.target.select(); }}
       onBlur={() => { setEnfocado(false); resto.onBlur?.(); }}
       onChange={(e) => {
-        const t = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+        const t = e.target.value.replace(/[^0-9.,]/g, '');
         setTexto(t);
-        const n = Number(t);
-        if (t !== '' && Number.isFinite(n)) onCambio(n);
-        else if (t === '') onCambio(0);
+        if (t === '') return onCambio(0);
+        const n = leerNumero(t, dinero);
+        if (n === null) return;
+        const factor = 10 ** decimales;
+        onCambio(Math.min(maximo, Math.round(n * factor) / factor));
       }}
       disabled={resto.disabled}
       aria-label={resto['aria-label']}

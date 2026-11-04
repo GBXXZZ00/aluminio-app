@@ -175,3 +175,32 @@ test('Varios colores y sistemas en un mismo lote', () => {
   assert.equal(r.generales.gomaComprar, 2);
   assert.equal(r.generales.tornillosComprar, 100);
 });
+
+test('Lectura de números escritos a mano', async () => {
+  const { leerNumero } = await import('./index.ts');
+  assert.equal(leerNumero('120,5'), 120.5);
+  assert.equal(leerNumero('120.5'), 120.5);
+  assert.equal(leerNumero('1,500', true), 1500);
+  assert.equal(leerNumero('1.500', true), 1500);
+  assert.equal(leerNumero('1.500,50', true), 1500.5);
+  assert.equal(leerNumero('1,500.50', true), 1500.5);
+  assert.equal(leerNumero('1,500,000', true), 1500000);
+  assert.equal(leerNumero('12,5', true), 12.5);
+  assert.equal(leerNumero('0'), 0);
+  assert.equal(leerNumero(''), null);
+  assert.equal(leerNumero('1.2.3'), null);
+  assert.equal(leerNumero('-5'), null);
+});
+
+test('Redondeo .x5 siempre hacia arriba y disco inválido', async () => {
+  const { r1, cortesVentana, acomodarEnBarras } = await import('./index.ts');
+  assert.equal(r1(42.95), 43);
+  assert.equal(r1((94.1 - 8.2) / 2), 43);
+  assert.equal(r1((100.1 - 8.2) / 2), 46);
+  const c = cortesVentana({ etiqueta: 'V1', cantidad: 1, sistema: 'ecobel', color: 'negro', alto: 100, ancho: 94.1, proteccion: false });
+  assert.equal(c.piezas.find((p) => p.perfil === 'Horizontal')!.medida, 43);
+  assert.equal(c.vidrio.ancho, 42.5);
+  assert.equal(acomodarEnBarras([300, 300.5], -0.5).length, 2);
+  assert.equal(acomodarEnBarras([100, 100], Number.NaN).length, 1);
+  assert.equal(acomodarEnBarras([100, 100], Number.NaN)[0].sobrante, 399.4);
+});

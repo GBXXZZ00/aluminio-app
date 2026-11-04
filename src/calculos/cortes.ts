@@ -63,7 +63,7 @@ export function validarVentana(v: VentanaEntrada): string[] {
     errores.push('El alto y el ancho deben ser mayores de 20 cm.');
   }
   if (v.alto > LARGO_BARRA_CM || v.ancho > LARGO_BARRA_CM) {
-    errores.push('El alto y el ancho no pueden pasar de 600 cm (largo de la barra).');
+    errores.push('El alto y el ancho no pueden pasar de 600 cm.');
   }
   if (errores.length) return errores;
 
@@ -72,7 +72,7 @@ export function validarVentana(v: VentanaEntrada): string[] {
     errores.push('La medida es demasiado pequeña: algún corte o vidrio da cero o negativo.');
   }
   if (c.piezas.some((p) => p.medida > LARGO_BARRA_CM)) {
-    errores.push('Algún corte es más largo que la barra de 600 cm.');
+    errores.push('Algún corte sale más largo que una barra completa.');
   }
   return errores;
 }

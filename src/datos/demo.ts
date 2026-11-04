@@ -109,6 +109,7 @@ export function crearApiDemo(): Api {
       return sesion;
     },
     async cerrarSesion() { sesion = null; },
+    escucharSalida() { return () => {}; },
     async sesionActual() { return sesion; },
     async cambiarMiClave(nueva) {
       const p = perfiles.find((x) => x.id === yo().perfil.id)!;
@@ -211,7 +212,7 @@ export function crearApiDemo(): Api {
       });
       for (const l of lotes) if (l.herreria_id === h() && !l.cierre_id) l.cierre_id = id;
       for (const m of mano) if (m.herreria_id === h() && !m.cierre_id) m.cierre_id = id;
-      return { ok: true, numero };
+      return { ok: true, numero, resumen: r };
     },
     async listarCierres() {
       if (!puedeFin()) throw new Error('No tienes permiso para hacer esto.');

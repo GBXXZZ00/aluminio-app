@@ -1,5 +1,5 @@
 // Pantalla de un lote: cliente, ventanas con precios, dinero del lote.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, type Gastos, type Lote as TLote, type VentanaFila } from '../datos/index.ts';
 import { usePermisos, useSesion } from '../sesion.tsx';
@@ -18,6 +18,10 @@ export function Lote() {
   const [cliente, setCliente] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<VentanaFila | null>(null);
+  // Los guardados de gastos van en fila, uno detrás de otro (nunca dos a la vez).
+  const colaGastos = useRef<Promise<void>>(Promise.resolve());
+  const gastosRef = useRef(gastos);
+  gastosRef.current = gastos;
 
   const cargar = useCallback(async () => {
     try {
@@ -51,14 +55,17 @@ export function Lote() {
     }
   }
 
-  async function guardarGastos() {
+  function guardarGastos() {
     if (cerrado) return;
-    try {
-      await api.guardarGastos(lote!.id, gastos);
-      avisar('Gastos guardados');
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    const loteId = lote!.id;
+    colaGastos.current = colaGastos.current.then(async () => {
+      try {
+        await api.guardarGastos(loteId, gastosRef.current);
+        avisar('Gastos guardados');
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
   }
 
   async function confirmarBorrar() {
@@ -140,12 +147,12 @@ export function Lote() {
               <span className="sec" style={{ fontSize: 14, fontWeight: 600 }}>Gastos del lote ($)</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <label htmlFor="g-perfil" style={{ flex: 1 }}>Perfilería de aluminio<br /><span className="ayuda" style={{ fontSize: 12 }}>incluye accesorios</span></label>
-                <CampoNumero id="g-perfil" valor={gastos.perfileria} disabled={cerrado} style={{ width: 130 }}
+                <CampoNumero id="g-perfil" dinero valor={gastos.perfileria} disabled={cerrado} style={{ width: 130 }}
                   onCambio={(n) => setGastos((g) => ({ ...g, perfileria: n }))} onBlur={guardarGastos} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <label htmlFor="g-vidrio" style={{ flex: 1 }}>Vidrio</label>
-                <CampoNumero id="g-vidrio" valor={gastos.vidrio} disabled={cerrado} style={{ width: 130 }}
+                <CampoNumero id="g-vidrio" dinero valor={gastos.vidrio} disabled={cerrado} style={{ width: 130 }}
                   onCambio={(n) => setGastos((g) => ({ ...g, vidrio: n }))} onBlur={guardarGastos} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
