@@ -1,5 +1,5 @@
 // Piezas de interfaz que se repiten en varias pantallas.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Atras } from './iconos.tsx';
 import { leerNumero } from '../calculos/index.ts';
@@ -28,8 +28,13 @@ export function Cargando({ texto = 'Cargando…' }: { texto?: string }) {
 }
 
 export function ErrorCaja({ mensaje }: { mensaje: string | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Si el aviso queda fuera de la pantalla, se lleva a la vista.
+  useEffect(() => {
+    if (mensaje) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [mensaje]);
   if (!mensaje) return null;
-  return <div className="aviso error" role="alert">{mensaje}</div>;
+  return <div ref={ref} className="aviso error" role="alert">{mensaje}</div>;
 }
 
 export function Interruptor({ activo, onCambio, etiqueta, ayuda }: { activo: boolean; onCambio: (v: boolean) => void; etiqueta: string; ayuda?: string }) {

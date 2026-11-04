@@ -43,10 +43,12 @@ export function VentanaForm() {
         setCantidad(v.cantidad); setSistema(v.sistema); setColor(v.color);
         setAlto(v.alto); setAncho(v.ancho); setProteccion(v.proteccion);
         setUnitario(v.precio_unitario); setTotal(v.precio_total);
-        setPrecioManual(true);
+        // Si el precio guardado era el sugerido, al corregir medidas se recalcula solo.
+        const sugerido = precioUnitarioSugerido(v.sistema, v.alto, v.ancho);
+        setPrecioManual(Math.abs(v.precio_unitario - sugerido) >= 0.005);
       }
       setListo(true);
-    }).catch((e) => { setError((e as Error).message); setListo(true); });
+    }).catch((e) => { setError((e as Error).message); setNumLote(-1); setListo(true); });
   }, [loteId, vid, editar, nav]);
 
   // Precio sugerido automático (oculto el precio por m²).
@@ -87,6 +89,14 @@ export function VentanaForm() {
   }
 
   if (!listo) return <main className="pantalla"><Cargando /></main>;
+  if (numLote < 0) {
+    return (
+      <main className="pantalla">
+        <ErrorCaja mensaje={error} />
+        <button type="button" className="btn secundario" onClick={() => nav('/lotes')}>Volver a los lotes</button>
+      </main>
+    );
+  }
 
   const opcion = (activo: boolean, onClick: () => void, contenido: React.ReactNode) => (
     <button type="button" className="opcion" aria-pressed={activo} onClick={onClick}>{contenido}</button>
@@ -169,7 +179,12 @@ export function VentanaForm() {
           <CampoNumero id="precio-total" dinero maximo={9_000_000} valor={total} style={{ width: 150, fontSize: 24, fontWeight: 600, color: 'var(--acento)', borderColor: 'var(--acento)' }}
             onCambio={(n) => { setPrecioManual(true); setTotal(n); setUnitario(unitarioDesdeTotal(n, cantidad)); }} />
         </div>
-        <span className="ayuda">El precio se propone solo según el área. Puedes cambiar el unitario o el total y el otro se ajusta.</span>
+        <span className="ayuda">
+          {precioManual
+            ? 'Este precio lo escribiste a mano: no cambia solo si corriges las medidas.'
+            : 'El precio se propone solo según el área. Puedes cambiar el unitario o el total y el otro se ajusta.'}
+        </span>
+        {total === 0 && alto > 0 && ancho > 0 && <span className="peligro" style={{ fontSize: 14 }}>Ojo: el precio está en $0.</span>}
         {precioManual && (
           <button type="button" className="btn secundario" onClick={() => setPrecioManual(false)}>Volver al precio sugerido</button>
         )}

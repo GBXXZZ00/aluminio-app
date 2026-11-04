@@ -16,10 +16,10 @@ function TablaResumen({ r }: { r: Resumen }) {
   ];
   return (
     <div className="tarjeta" style={{ overflow: 'hidden' }}>
-      {filas.map(([nombre, valor]) => (
+      {filas.map(([nombre, valor], i) => (
         <div key={nombre} className="fila">
-          <span className={valor < 0 ? 'sec' : undefined}>{nombre}</span>
-          <span className={`mono${valor < 0 ? ' sec' : ''}`} style={{ fontSize: 18, fontWeight: valor < 0 ? 400 : 600 }}>{fmtDinero(valor)}</span>
+          <span className={i > 0 ? 'sec' : undefined}>{nombre}</span>
+          <span className={`mono${i > 0 ? ' sec' : ''}`} style={{ fontSize: 18, fontWeight: i > 0 ? 400 : 600 }}>{i > 0 ? '−' + fmtDinero(Math.abs(valor)) : fmtDinero(valor)}</span>
         </div>
       ))}
       <div className="fila" style={{ borderTop: '1px solid var(--borde)' }}>
@@ -31,7 +31,7 @@ function TablaResumen({ r }: { r: Resumen }) {
 }
 
 function TablaLotes({ r }: { r: Resumen }) {
-  const cols = 'minmax(0,1fr) 78px 78px 78px';
+  const cols = 'minmax(0,1fr) 72px 68px 72px';
   return (
     <div className="tarjeta" style={{ overflow: 'hidden' }}>
       <div className="tabla-cab" style={{ gridTemplateColumns: cols }}>
@@ -115,7 +115,9 @@ export function Finanzas() {
           <div className="tarjeta" style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span className="etiqueta-seccion">Ganancia del período</span>
             <span className="grande-num">{fmtDinero(r.ganancia)}</span>
-            <span className="sec" style={{ fontSize: 13 }}>{r.cantidad_lotes} lotes abiertos · {r.cantidad_ventanas} ventanas</span>
+            <span className="sec" style={{ fontSize: 13 }}>
+              {r.cantidad_lotes} {r.cantidad_lotes === 1 ? 'lote abierto' : 'lotes abiertos'} · {r.cantidad_ventanas} {r.cantidad_ventanas === 1 ? 'ventana' : 'ventanas'}
+            </span>
           </div>
           <TablaResumen r={r} />
           <span className="etiqueta-seccion">Lotes abiertos</span>

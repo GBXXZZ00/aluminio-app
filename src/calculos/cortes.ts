@@ -19,8 +19,8 @@ export function cortesVentana(v: VentanaEntrada): CortesVentana {
     const liso = r1(A - 4.3);
     const horizontal = r1((W - 8.2) / 2);
     piezas = [
-      { perfil: 'Marco', medida: A, cantidad: 2 * q },
-      { perfil: 'Marco', medida: W, cantidad: 2 * q },
+      { perfil: 'Marco', nota: 'alto', medida: A, cantidad: 2 * q },
+      { perfil: 'Marco', nota: 'ancho', medida: W, cantidad: 2 * q },
       { perfil: 'Liso', medida: liso, cantidad: 2 * q },
       { perfil: 'Enganche', medida: liso, cantidad: 2 * q },
       { perfil: 'Horizontal', medida: horizontal, cantidad: 4 * q },

@@ -30,6 +30,14 @@ export function Historial() {
   }, []);
   useEffect(() => { cargar(); }, [cargar]);
 
+  // El menú ⋮ se cierra al tocar en cualquier otra parte.
+  useEffect(() => {
+    if (!menu) return;
+    const cerrar = () => setMenu(null);
+    const t = window.setTimeout(() => document.addEventListener('click', cerrar), 0);
+    return () => { window.clearTimeout(t); document.removeEventListener('click', cerrar); };
+  }, [menu]);
+
   if (!sesion) return null;
   const tema = sesion.perfil.tema;
 
@@ -78,7 +86,7 @@ export function Historial() {
   const tarjetaLote = (l: Lote, destacado: boolean) => (
     <div key={l.id} className={`tarjeta${destacado ? ' acentuada' : ''}`} style={{ position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <Link to={`/lote/${l.id}`} className="lote-item" style={{ flex: 1 }}>
+        <Link to={`/lote/${l.id}`} className="lote-item" style={{ flex: 1, minWidth: 0 }}>
           <div className="lote-num" style={{ color: destacado ? 'var(--acento)' : undefined }}>{fmtLote(l.numero)}</div>
           <div className="info">
             <div className="cli" style={l.cliente ? undefined : { color: 'var(--texto-2)', fontStyle: 'italic' }}>{l.cliente || 'Sin cliente'}</div>
@@ -105,7 +113,7 @@ export function Historial() {
   );
 
   return (
-    <main className="pantalla" onClick={() => menu && setMenu(null)}>
+    <main className="pantalla">
       <header className="encabezado" style={{ alignItems: 'flex-start' }}>
         <div className="titulo">
           <div className="mono acento" style={{ fontSize: 13, letterSpacing: '.08em', textTransform: 'uppercase' }}>Herrería {sesion.herreria.nombre}</div>
@@ -155,11 +163,13 @@ export function Historial() {
       {nuevo && (
         <Modal titulo="Nuevo lote" onCerrar={() => setNuevo(false)}>
           <p className="ayuda">El número de lote y la fecha se ponen solos.</p>
-          <div className="campo">
-            <label htmlFor="cliente-nuevo">Cliente u obra (opcional)</label>
-            <input id="cliente-nuevo" className="entrada" maxLength={80} value={cliente} onChange={(e) => setCliente(e.target.value)} autoFocus />
-          </div>
-          <button type="button" className="btn primario" disabled={creando} onClick={crear}>{creando ? 'Creando…' : 'Crear lote'}</button>
+          <form className="pila" onSubmit={(e) => { e.preventDefault(); if (!creando) crear(); }}>
+            <div className="campo">
+              <label htmlFor="cliente-nuevo">Cliente u obra (opcional)</label>
+              <input id="cliente-nuevo" className="entrada" maxLength={80} enterKeyHint="go" value={cliente} onChange={(e) => setCliente(e.target.value)} autoFocus />
+            </div>
+            <button type="submit" className="btn primario" disabled={creando}>{creando ? 'Creando…' : 'Crear lote'}</button>
+          </form>
           <button type="button" className="btn secundario" onClick={() => setNuevo(false)}>Cancelar</button>
         </Modal>
       )}

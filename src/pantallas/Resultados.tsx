@@ -104,7 +104,7 @@ export function Resultados() {
           </div>
           {c.piezas.map((p, i) => (
             <div key={i} className="tabla-fila" style={{ gridTemplateColumns: 'minmax(0,1fr) 96px 56px' }}>
-              <span style={{ fontSize: 16 }}>{p.perfil}</span>
+              <span style={{ fontSize: 16 }}>{p.perfil}{p.nota ? <span className="sec" style={{ fontSize: 13 }}> ({p.nota})</span> : null}</span>
               <span className="mono der" style={{ fontSize: 18, fontWeight: 600 }}>{fmtCm(p.medida)}</span>
               <span className="mono der acento" style={{ fontSize: 16 }}>×{p.cantidad}</span>
             </div>
@@ -150,6 +150,9 @@ export function Resultados() {
             <CampoNumero id="disco" valor={disco} decimales={2} disabled={cerrado} style={{ width: 80, minHeight: 44 }}
               onCambio={setDisco} onBlur={guardarDisco} />
           </div>
+          {discoValido !== disco && (
+            <div className="aviso error" role="alert">El disco debe medir entre 0 y 2 cm. Mientras tanto se calcula con 0.3 cm.</div>
+          )}
 
           <div className="tarjeta" style={{ overflow: 'hidden' }}>
             <div className="fila cabeza"><span>Tubos a comprar</span><span className="sec" style={{ fontSize: 13, fontWeight: 400 }}>barras</span></div>

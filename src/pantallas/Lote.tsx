@@ -25,12 +25,14 @@ export function Lote() {
 
   const cargar = useCallback(async () => {
     try {
+      setError(null);
       const r = await api.obtenerLote(id!);
       setLote(r.lote);
       setVentanas(r.ventanas);
       setCliente(r.lote.cliente ?? '');
       if (permisos.finanzas) setGastos(await api.obtenerGastos(id!));
     } catch (e) {
+      setLote(null);
       setError((e as Error).message);
     }
   }, [id, permisos.finanzas]);

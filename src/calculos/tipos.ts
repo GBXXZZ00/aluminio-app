@@ -21,6 +21,8 @@ export interface VentanaEntrada {
 /** Un corte de perfil: `cantidad` piezas de `medida` cm. */
 export interface Pieza {
   perfil: string;
+  /** Aclaración solo para mostrar, ej. "alto" / "ancho" en el Marco. */
+  nota?: string;
   medida: number;
   cantidad: number;
 }

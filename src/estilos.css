@@ -42,7 +42,7 @@
   --boton-texto: #f2f2f0;
   --peligro: #c62828;
   --exito: #1e8a4f;
-  --acento: #c4560c;
+  --acento: #a8480a;
   --acento-fondo: #fdeee3;
   --tecla: inset 0 1px 0 #fff, 0 0 0 1px rgba(0,0,0,.05), inset 0 -2px 0 rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.06);
   --tecla-2: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 0 rgba(0,0,0,.10);
@@ -120,8 +120,8 @@ a { color: var(--acento); }
 .contador .icono-btn { width: 60px; height: 60px; font-size: 28px; }
 
 /* Interruptor */
-.interruptor { width: 56px; height: 34px; border: none; border-radius: 999px; padding: 3px; background: var(--tarjeta-2); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); display: flex; align-items: center; cursor: pointer; flex: none; }
-.interruptor span { width: 28px; height: 28px; border-radius: 50%; background: #fafafa; box-shadow: 0 1px 2px rgba(0,0,0,.5); transition: margin .15s; }
+.interruptor { width: 64px; height: 44px; border: none; border-radius: 999px; padding: 4px; background: var(--tarjeta-2); box-shadow: inset 0 2px 4px rgba(0,0,0,.4); display: flex; align-items: center; cursor: pointer; flex: none; }
+.interruptor span { width: 36px; height: 36px; border-radius: 50%; background: #fafafa; box-shadow: 0 1px 2px rgba(0,0,0,.5); transition: margin .15s; }
 .interruptor[aria-checked="true"] { background: var(--acento); }
 .interruptor[aria-checked="true"] span { margin-left: auto; }
 

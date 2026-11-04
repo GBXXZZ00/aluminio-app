@@ -55,7 +55,7 @@ export function pdfLote(numero: number, fecha: Date, herreria: string, cliente: 
   const cortes: string[][] = [];
   for (const c of r.cortes) {
     for (const p of c.piezas) {
-      cortes.push([c.etiqueta, `${NOMBRE_SISTEMA[c.sistema]} ${COLOR_NOMBRE[c.color]}`, p.perfil, fmtCm(p.medida), String(p.cantidad)]);
+      cortes.push([c.etiqueta, `${NOMBRE_SISTEMA[c.sistema]} ${COLOR_NOMBRE[c.color]}`, p.nota ? `${p.perfil} (${p.nota})` : p.perfil, fmtCm(p.medida), String(p.cantidad)]);
     }
   }
   autoTable(doc, { ...estiloTabla, startY: ultimaY(doc) + 8, head: [['Ventana', 'Sistema', 'Pieza', 'Medida cm', 'Cant.']], body: cortes });
