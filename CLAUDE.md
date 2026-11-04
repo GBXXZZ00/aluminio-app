@@ -25,6 +25,10 @@ El dueño (usuario administrador **raymundo**) no es programador: toda la interf
 
 ## 3. Fórmulas (todas las ventanas son de 2 paños)
 
+**Redondeo:** las medidas de corte se redondean a 1 decimal y **.x5 siempre sube** (42.95 → 43.0), como se corta en el taller.
+
+**Tamaño mínimo:** no hay mínimo de fábrica; solo se rechaza lo imposible (medidas ≤ 20 cm o algún corte/vidrio ≤ 0).
+
 **Protección:** si la ventana lleva protección, se restan **6 cm al alto y 6 cm al ancho** antes de todo cálculo de cortes. (El **precio** usa la medida original.)
 
 Sea `A` = alto de trabajo y `W` = ancho de trabajo (ya con la resta de protección si aplica). Cantidades **por ventana**; multiplicar por la cantidad de ventanas iguales.
@@ -62,6 +66,7 @@ Marco 12 × 94.0 → 2 barras · Liso 6 × 89.7 → 1 · Enganche 6 × 89.7 → 
 
 - Agrupar piezas por **sistema + perfil + color** (ej. Ecobel · Marco · Negro).
 - **No** dividir total de metros entre 6: acomodar las piezas **barra por barra** (first-fit decreasing en barras de 600 cm), descontando el **grosor del disco** por cada corte (por defecto **0.3 cm**, editable por lote). Una pieza nunca se reparte entre dos barras.
+- **Decisión del dueño:** se acepta que este método use a veces (≈2 % de los casos) **1 barra más** que el acomodo perfecto; no buscar el acomodo óptimo.
 - Mostrar el acomodo de cada barra y su sobrante.
 - **Nunca** mostrar "6 m" / "(6 metros)" en ninguna pantalla, PDF ni mensaje. Solo "Marco: 2".
 
