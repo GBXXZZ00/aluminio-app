@@ -231,8 +231,17 @@ export function crearApiSupabase(): Api {
     },
 
     async guardarGastos(loteId, g) {
-      const { error } = await sb.from('gastos_lote').upsert({ lote_id: loteId, perfileria: g.perfileria, vidrio: g.vidrio });
+      // Primero se intenta actualizar; si aún no existe la fila, se crea.
+      // (Un "upsert" intentaría reescribir lote_id, que la app no puede tocar.)
+      const { data: act, error } = await sb
+        .from('gastos_lote')
+        .update({ perfileria: g.perfileria, vidrio: g.vidrio })
+        .eq('lote_id', loteId)
+        .select('lote_id');
       if (error) falla(error);
+      if (act && act.length) return;
+      const { error: e2 } = await sb.from('gastos_lote').insert({ lote_id: loteId, perfileria: g.perfileria, vidrio: g.vidrio });
+      if (e2) falla(e2);
     },
 
     async resumen() {
