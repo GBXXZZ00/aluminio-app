@@ -44,7 +44,14 @@ begin
   insert into public.lotes (cliente, herreria_id, numero) values ('F1', 2, 999) returning id into l1;
   select r || 'F lote1 herreria/num (esperado 1/1): ' || herreria_id || '/' || numero || E'\n' into r from public.lotes where id = l1;
   insert into public.lotes (cliente) values ('F2') returning id into l2;
-  delete from public.lotes where id = l2;
+  delete from public.lotes where id = l2; get diagnostics n = row_count; r := r || 'user sin finanzas borra lote filas (esperado 0): ' || n || E'\n';
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub',ff,'role','authenticated')::text, true);
+  execute 'set local role authenticated';
+  delete from public.lotes where id = l2; get diagnostics n = row_count; r := r || 'user con finanzas borra lote filas (esperado 1): ' || n || E'\n';
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub',fu,'role','authenticated')::text, true);
+  execute 'set local role authenticated';
   insert into public.lotes (cliente) values ('F3') returning id into l3;
   select numero into n from public.lotes where id = l3; r := r || 'F tras borrar, num (esperado 3): ' || n || E'\n';
   select count(*) into n from public.lotes; r := r || 'F user ve lotes (esperado 2): ' || n || E'\n';

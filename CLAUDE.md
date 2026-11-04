@@ -21,7 +21,7 @@ El dueño (usuario administrador **raymundo**) no es programador: toda la interf
 - Número **consecutivo por herrería**, empieza en 001, se asigna en el servidor, **nunca se reutiliza** (ni al borrar, ni después de un cierre: sigue 005, 006…).
 - Fecha automática. Campo opcional "Cliente u obra".
 - Cada entrada de ventana: **cantidad** de ventanas iguales, **sistema** (ecobel / panoramico), **color** (negro / blanco), **alto** y **ancho** en cm, **protección** sí/no, **precio unitario** y **precio total**.
-- Opciones del lote: abrir, duplicar, eliminar. Un lote cerrado (con `cierre_id`) es de solo lectura.
+- Opciones del lote: abrir, duplicar, eliminar. **Eliminar solo con permiso de Finanzas** (borra también sus gastos); a los demás no se les muestra la opción. Un lote cerrado (con `cierre_id`) es de solo lectura.
 
 ## 3. Fórmulas (todas las ventanas son de 2 paños)
 
