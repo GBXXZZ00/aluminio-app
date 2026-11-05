@@ -1,7 +1,7 @@
 // Finanzas: resumen del período, lotes abiertos, mano de obra y cierre general.
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, type Cierre, type ManoObra, type Resumen } from '../datos/index.ts';
+import { api, type Cierre, type Lote, type ManoObra, type Resumen } from '../datos/index.ts';
 import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtDinero, fmtFecha, fmtLote } from '../calculos/index.ts';
 import { CampoNumero, Cargando, Encabezado, ErrorCaja, Modal } from '../componentes/comunes.tsx';
@@ -153,7 +153,7 @@ export function Finanzas() {
             <Link to="/cierre" className="btn acento" style={{ minHeight: 60, fontSize: 18 }}><Candado /> Cierre general de lotes</Link>
           )}
           <Link to="/cierres" className="tarjeta" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', textDecoration: 'none', color: 'var(--texto)' }}>
-            <span style={{ flex: 1 }}><span style={{ display: 'block', fontWeight: 600 }}>Cierres anteriores</span><span className="sec" style={{ fontSize: 13 }}>Consulta el resumen de cada cierre</span></span>
+            <span style={{ flex: 1 }}><span style={{ display: 'block', fontWeight: 600 }}>Cierres</span><span className="sec" style={{ fontSize: 13 }}>Lotes cerrados y resumen de cada cierre</span></span>
             <span className="sec"><Flecha /></span>
           </Link>
         </>
@@ -283,13 +283,18 @@ function textoCierre(numero: number, herreria: string, r: Resumen): string {
 export function Cierres() {
   const { sesion, avisar } = useSesion();
   const [lista, setLista] = useState<Cierre[] | null>(null);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [abierto, setAbierto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api.listarCierres().then(setLista).catch((e) => setError((e as Error).message)); }, []);
+  useEffect(() => {
+    Promise.all([api.listarCierres(), api.listarLotes()])
+      .then(([c, l]) => { setLista(c); setLotes(l.filter((x) => x.cierre_id)); })
+      .catch((e) => setError((e as Error).message));
+  }, []);
   if (!sesion) return null;
   return (
     <main className="pantalla">
-      <Encabezado volver="/finanzas" titulo="Cierres anteriores" sub={`Herrería ${sesion.herreria.nombre}`} />
+      <Encabezado volver="/lotes" titulo="Cierres" sub={`Herrería ${sesion.herreria.nombre}`} />
       <ErrorCaja mensaje={error} />
       {!lista && !error && <Cargando />}
       {lista && !lista.length && <p className="ayuda">Todavía no se ha hecho ningún cierre general.</p>}
@@ -307,6 +312,17 @@ export function Cierres() {
             <div className="pila" style={{ padding: 12 }}>
               <TablaResumen r={c.detalle} />
               <TablaLotes r={c.detalle} />
+              <span className="etiqueta-seccion">Lotes de este cierre</span>
+              {lotes.filter((l) => l.cierre_id === c.id).map((l) => (
+                <Link key={l.id} to={`/lote/${l.id}`} className="tarjeta lote-item" style={{ textDecoration: 'none' }}>
+                  <div className="lote-num">{fmtLote(l.numero)}</div>
+                  <div className="info" style={{ flex: 1 }}>
+                    <div className="cli" style={l.cliente ? undefined : { color: 'var(--texto-2)', fontStyle: 'italic' }}>{l.cliente || 'Sin cliente'}</div>
+                    <div className="sec" style={{ fontSize: 14 }}>{fmtFecha(new Date(l.creado_en))} · {l.total_ventanas ?? 0} {l.total_ventanas === 1 ? 'ventana' : 'ventanas'}</div>
+                  </div>
+                  <span className="sec"><Flecha /></span>
+                </Link>
+              ))}
               <button type="button" className="btn secundario" onClick={() => import('../exportar/archivos.ts').catch(() => null).then((m) => m ? m.pdfCierre(c.numero, sesion.herreria.nombre, new Date(c.realizado_en), c.detalle) : avisar('No se pudo crear el PDF. Recarga la app e inténtalo de nuevo.'))}>Descargar PDF</button>
             </div>
           )}
