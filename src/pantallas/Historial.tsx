@@ -5,6 +5,7 @@ import { api, type Lote } from '../datos/index.ts';
 import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtFecha, fmtLote } from '../calculos/index.ts';
 import { Cargando, ErrorCaja, Modal } from '../componentes/comunes.tsx';
+import { AgregarInicio } from '../componentes/AgregarInicio.tsx';
 import { Flecha, Grafica, Luna, Mas, Puntos, Salir, Sol, Usuarios } from '../componentes/iconos.tsx';
 
 export function Historial() {
@@ -125,6 +126,7 @@ export function Historial() {
         {permisos.admin && <Link to="/usuarios" className="icono-btn" aria-label="Usuarios"><Usuarios /></Link>}
         <button type="button" className="icono-btn" aria-label="Cerrar sesión" onClick={() => salir().then(() => nav('/', { replace: true }))}><Salir /></button>
       </header>
+      <AgregarInicio />
 
       <button type="button" className="btn primario" onClick={() => { setCliente(''); setNuevo(true); }}><Mas /> Nuevo lote</button>
 
