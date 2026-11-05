@@ -1,9 +1,10 @@
 // Botón "Agregar a inicio": ancla la app a la pantalla de inicio del celular.
 // - Android con Chrome: abre directamente la ventana del sistema.
 // - iPhone o cualquier otro caso: muestra los pasos con dibujos sencillos.
-// No aparece si la app ya se abrió desde el ícono.
+// Sale una sola vez: cuando la app ya está agregada (o la persona dice que ya
+// la agregó), no vuelve a aparecer en ese teléfono.
 import { useEffect, useState } from 'react';
-import { anclarDirecto, escucharInstalacion, esIphone, iphoneSinSafari, puedeAvisoDirecto, yaAnclada } from '../instalar.ts';
+import { anclarDirecto, escucharInstalacion, esIphone, iphoneSinSafari, marcarAnclada, puedeAvisoDirecto, yaAnclada } from '../instalar.ts';
 import { Modal } from './comunes.tsx';
 
 function Paso({ n, children }: { n: number; children: React.ReactNode }) {
@@ -72,7 +73,8 @@ export function AgregarInicio() {
               <Paso n={3}>Toca <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>, y luego <strong>"Agregar"</strong>.</Paso>
             </ol>
           )}
-          <button type="button" className="btn primario" onClick={() => setPasos(false)}>Entendido</button>
+          <button type="button" className="btn primario" onClick={() => { marcarAnclada(); setPasos(false); setListo(true); }}>Ya la agregué</button>
+          <button type="button" className="btn secundario" onClick={() => setPasos(false)}>Ahora no</button>
         </Modal>
       )}
     </>

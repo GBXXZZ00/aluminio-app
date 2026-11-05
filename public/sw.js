@@ -5,7 +5,7 @@
 // Solo guarda archivos de la propia app; los datos (Supabase) siempre se piden
 // en línea y nunca se guardan aquí.
 
-const CACHE = 'cortes-v2';
+const CACHE = 'cortes-v3';
 // Si internet tarda más que esto en dar la página principal, se usa la guardada.
 const ESPERA_PAGINA_MS = 3500;
 
