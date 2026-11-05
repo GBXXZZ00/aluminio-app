@@ -85,7 +85,7 @@ export function Lote() {
   return (
     <main className="pantalla">
       <Encabezado
-        volver="/lotes"
+        volver={cerrado ? '/cierres' : '/lotes'}
         titulo={<span className="mono">Lote {fmtLote(lote.numero)}</span>}
         sub={`Herrería ${sesion.herreria.nombre} · creado ${fmtFecha(new Date(lote.creado_en))}`}
       />

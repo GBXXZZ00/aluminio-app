@@ -6,7 +6,7 @@ import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtFecha, fmtLote } from '../calculos/index.ts';
 import { Cargando, ErrorCaja, Modal } from '../componentes/comunes.tsx';
 import { AgregarInicio } from '../componentes/AgregarInicio.tsx';
-import { Flecha, Grafica, Luna, Mas, Puntos, Salir, Sol, Usuarios } from '../componentes/iconos.tsx';
+import { Archivo, Flecha, Grafica, Luna, Mas, Puntos, Salir, Sol, Usuarios } from '../componentes/iconos.tsx';
 
 export function Historial() {
   const { sesion, salir, cambiarTema, avisar } = useSesion();
@@ -24,7 +24,8 @@ export function Historial() {
   const cargar = useCallback(async () => {
     try {
       setError(null);
-      setLotes(await api.listarLotes());
+      // Los lotes cerrados no se muestran aquí: viven en el módulo "Cierres".
+      setLotes((await api.listarLotes()).filter((l) => !l.cierre_id));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -81,8 +82,7 @@ export function Historial() {
     }
   }
 
-  const abiertos = lotes?.filter((l) => !l.cierre_id) ?? [];
-  const cerrados = lotes?.filter((l) => l.cierre_id) ?? [];
+  const abiertos = lotes ?? [];
 
   const tarjetaLote = (l: Lote, destacado: boolean) => (
     <div key={l.id} className={`tarjeta${destacado ? ' acentuada' : ''}`} style={{ position: 'relative' }}>
@@ -141,6 +141,17 @@ export function Historial() {
         </Link>
       )}
 
+      {permisos.finanzas && (
+        <Link to="/cierres" className="tarjeta" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', textDecoration: 'none', color: 'var(--texto)' }}>
+          <span style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--tarjeta-2)', color: 'var(--texto-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Archivo /></span>
+          <span style={{ flex: 1 }}>
+            <span style={{ display: 'block', fontWeight: 600 }}>Cierres</span>
+            <span className="sec" style={{ fontSize: 13 }}>Lotes cerrados y resumen de cada cierre</span>
+          </span>
+          <span className="sec"><Flecha /></span>
+        </Link>
+      )}
+
       <ErrorCaja mensaje={error} />
       {lotes === null && !error && <Cargando />}
 
@@ -152,13 +163,6 @@ export function Historial() {
           </div>
           {abiertos.length === 0 && <p className="ayuda">No hay lotes abiertos. Toca "Nuevo lote" para empezar.</p>}
           <div className="lista">{abiertos.map((l, i) => tarjetaLote(l, i === 0))}</div>
-
-          {cerrados.length > 0 && (
-            <>
-              <span className="etiqueta-seccion">Lotes cerrados</span>
-              <div className="lista">{cerrados.map((l) => tarjetaLote(l, false))}</div>
-            </>
-          )}
         </>
       )}
 
