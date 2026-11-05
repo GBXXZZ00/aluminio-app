@@ -119,10 +119,10 @@ export function crearApiDemo(): Api {
     },
     async guardarTema(tema) { if (sesion) sesion.perfil.tema = tema; },
 
-    async listarLotes() {
+    async listarLotes(soloAbiertos = false) {
       await espera();
       return lotes
-        .filter((l) => l.herreria_id === h())
+        .filter((l) => l.herreria_id === h() && (!soloAbiertos || !l.cierre_id))
         .sort((a, b) => b.numero - a.numero)
         .map((l) => ({ ...l, total_ventanas: ventanas.filter((v) => v.lote_id === l.id).reduce((t, v) => t + v.cantidad, 0) }));
     },

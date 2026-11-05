@@ -132,7 +132,8 @@ export interface Api {
   cambiarMiClave(nueva: string): Promise<void>;
   guardarTema(tema: Tema): Promise<void>;
 
-  listarLotes(): Promise<Lote[]>;
+  /** soloAbiertos: solo los lotes que no han pasado por un cierre. */
+  listarLotes(soloAbiertos?: boolean): Promise<Lote[]>;
   crearLote(cliente: string | null): Promise<Lote>;
   obtenerLote(id: string): Promise<{ lote: Lote; ventanas: VentanaFila[] }>;
   actualizarLote(id: string, cambios: { cliente?: string | null; disco_corte?: number }): Promise<void>;
