@@ -6,11 +6,13 @@ import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtFecha, fmtLote } from '../calculos/index.ts';
 import { Cargando, ErrorCaja, Modal } from '../componentes/comunes.tsx';
 import { AgregarInicio } from '../componentes/AgregarInicio.tsx';
-import { Archivo, Flecha, Grafica, Luna, Mas, Puntos, Salir, Sol, Usuarios } from '../componentes/iconos.tsx';
+import { Archivo, Grafica, Luna, Mas, Puntos, Salir, Sol } from '../componentes/iconos.tsx';
+import { BarraNav, useConBarra } from '../componentes/BarraNav.tsx';
 
 export function Historial() {
   const { sesion, salir, cambiarTema, avisar } = useSesion();
   const permisos = usePermisos();
+  const conBarra = useConBarra();
   const nav = useNavigate();
   // Se muestra al instante lo último que se vio; luego se actualiza.
   const [lotes, setLotes] = useState<Lote[] | null>(() => enMemoria<Lote[]>(claveLotes(true)) ?? null);
@@ -86,10 +88,10 @@ export function Historial() {
   const abiertos = lotes ?? [];
 
   const tarjetaLote = (l: Lote, destacado: boolean) => (
-    <div key={l.id} className={`tarjeta${destacado ? ' acentuada' : ''}`} style={{ position: 'relative' }}>
+    <div key={l.id} className="tarjeta" style={{ position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <Link to={`/lote/${l.id}`} className="lote-item" style={{ flex: 1, minWidth: 0 }}>
-          <div className="lote-num" style={{ color: destacado ? 'var(--acento)' : undefined }}>{fmtLote(l.numero)}</div>
+          <div className="lote-num" style={destacado ? { background: 'var(--hero)', color: '#fff' } : undefined}>{fmtLote(l.numero)}</div>
           <div className="info">
             <div className="cli" style={l.cliente ? undefined : { color: 'var(--texto-2)', fontStyle: 'italic' }}>{l.cliente || 'Sin cliente'}</div>
             <div className="sec" style={{ fontSize: 14 }}>
@@ -114,44 +116,42 @@ export function Historial() {
     </div>
   );
 
+  const totalVentanas = abiertos.reduce((t, l) => t + (l.total_ventanas ?? 0), 0);
+  const conVentanas = abiertos.filter((l) => (l.total_ventanas ?? 0) > 0).length;
+
   return (
-    <main className="pantalla">
-      <header className="encabezado" style={{ alignItems: 'flex-start' }}>
+    <main className={`pantalla${conBarra ? ' con-barra' : ''}`}>
+      <header className="encabezado">
         <div className="titulo">
-          <div className="mono acento" style={{ fontSize: 13, letterSpacing: '.08em', textTransform: 'uppercase' }}>Herrería {sesion.herreria.nombre}</div>
-          <h1 style={{ fontSize: 32 }}>Lotes</h1>
+          <div className="acento" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>Herrería {sesion.herreria.nombre}</div>
+          <h1 style={{ fontSize: 26 }}>Hola, {sesion.perfil.nombre.split(' ')[0]}</h1>
         </div>
         <button type="button" className="icono-btn" aria-label={tema === 'claro' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} onClick={cambiarTema}>
-          {tema === 'claro' ? <Sol /> : <Luna />}
+          {tema === 'claro' ? <Luna /> : <Sol />}
         </button>
-        {permisos.admin && <Link to="/usuarios" className="icono-btn" aria-label="Usuarios"><Usuarios /></Link>}
         <button type="button" className="icono-btn" aria-label="Cerrar sesión" onClick={() => salir().then(() => nav('/', { replace: true }))}><Salir /></button>
       </header>
+
+      <section className="hero" aria-label="Resumen de lotes abiertos">
+        <span className="hero-etq">Lotes abiertos</span>
+        <span className="hero-num">{lotes ? abiertos.length : '—'}</span>
+        <span className="hero-sub">{totalVentanas} {totalVentanas === 1 ? 'ventana' : 'ventanas'} en producción</span>
+        <div className="progreso" aria-hidden="true"><span style={{ width: `${abiertos.length ? Math.round((conVentanas / abiertos.length) * 100) : 0}%` }} /></div>
+        <div className="hero-pie">
+          <span>{conVentanas} con ventanas cargadas</span>
+          <span>{abiertos.length - conVentanas} {abiertos.length - conVentanas === 1 ? 'vacío' : 'vacíos'}</span>
+        </div>
+      </section>
+
+      <div className="acciones">
+        <button type="button" className="accion principal" onClick={() => { setCliente(''); setNuevo(true); }}>
+          <span className="circulo"><Mas /></span>Nuevo lote
+        </button>
+        {permisos.finanzas && <Link to="/finanzas" className="accion"><span className="circulo"><Grafica /></span>Finanzas</Link>}
+        {permisos.finanzas && <Link to="/cierres" className="accion"><span className="circulo"><Archivo /></span>Cierres</Link>}
+      </div>
+
       <AgregarInicio />
-
-      <button type="button" className="btn primario" onClick={() => { setCliente(''); setNuevo(true); }}><Mas /> Nuevo lote</button>
-
-      {permisos.finanzas && (
-        <Link to="/finanzas" className="tarjeta" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', textDecoration: 'none', color: 'var(--texto)' }}>
-          <span style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--acento-fondo)', color: 'var(--acento)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Grafica /></span>
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>Finanzas</span>
-            <span className="sec" style={{ fontSize: 13 }}>Ventas, gastos, ganancia y cierre</span>
-          </span>
-          <span className="sec"><Flecha /></span>
-        </Link>
-      )}
-
-      {permisos.finanzas && (
-        <Link to="/cierres" className="tarjeta" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', textDecoration: 'none', color: 'var(--texto)' }}>
-          <span style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--tarjeta-2)', color: 'var(--texto-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Archivo /></span>
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>Cierres</span>
-            <span className="sec" style={{ fontSize: 13 }}>Lotes cerrados y resumen de cada cierre</span>
-          </span>
-          <span className="sec"><Flecha /></span>
-        </Link>
-      )}
 
       <ErrorCaja mensaje={error} />
       {lotes === null && !error && <Cargando />}
@@ -188,6 +188,7 @@ export function Historial() {
           <button type="button" className="btn secundario" onClick={() => setBorrar(null)}>Cancelar</button>
         </Modal>
       )}
+      <BarraNav />
     </main>
   );
 }

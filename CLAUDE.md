@@ -120,15 +120,17 @@ Solo **vidrios**, un archivo: `Length,Width,Qty,Label` → alto, ancho, cantidad
 - Ganancia = vendido − perfilería − vidrio − mano de obra. Cálculo oficial: `resumen_periodo()` en el servidor.
 - **Cierre general**: muestra resumen, pide la **clave de cierre** (una por herrería, la crea/cambia solo el admin, guardada con bcrypt), archiva lotes y mano de obra abiertos (`cerrar_periodo`). No se deshace. Historial de cierres consultable.
 
-## 9. Diseño
-- Mobile-first, botones ≥ 52–60 px, campos con letra ≥ 16 px.
-- Tema oscuro (por defecto) y claro; se guarda por usuario (`perfiles.tema`).
-- Oscuro: fondo `#0a0a0a`, tarjetas `#171717` radio 16 px, texto `#fafafa` / `#a1a1a1`, bordes `#262626`, campos hundidos `#111214` radio 8 px, botón principal `#e5e5e5` con texto oscuro, botones radio 8 px.
-- Efecto 3D "tecla de teclado": `inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(255,255,255,.10), inset 0 -2px 0 rgba(0,0,0,.45)`; campos: `inset 0 2px 4px rgba(0,0,0,.6)`.
-- Acento por herrería: **Famoso naranja `#ff8833`** (claro: `#c4560c`), **Artesanos gris `#a1a1a1`**.
-- Fuentes: **Inter** (texto) y **Geist Mono** (medidas, números, lotes).
-- Botón de WhatsApp verde `#2FA866`.
-- Diseño de referencia: lienzo "Cortes / Aluminio" (12 pantallas).
+## 9. Diseño (aprobado por el dueño el 05/11/2026: "app de banco moderna + vidrio líquido")
+- Mobile-first, botones ≥ 52–58 px, campos con letra ≥ 16 px. Todo el estilo vive en `src/estilos.css` (variables de color).
+- Tarjetas limpias (blancas en claro, `#15171c` en oscuro), radio 22 px, sombra suave; botones radio 16–18 px; íconos y botones de acción **redondos**.
+- **Tarjeta principal con degradado** (`.hero`) con la cifra grande de cada pantalla (lotes abiertos, venta del lote, ganancia).
+- **Botones redondos con nombre** (`.acciones`/`.accion`): Nuevo lote, Finanzas, Cierres.
+- **Vidrio líquido** (`backdrop-filter`) SOLO en la barra de arriba, la **barra de navegación de abajo** (`BarraNav`), ventanas emergentes y menús. **No** ponerlo en tarjetas ni listas: en Android sencillos se vuelve lento.
+- Tema claro y oscuro; se guarda por usuario (`perfiles.tema`).
+- Acento por herrería: **Famoso naranja** (degradado naranja; texto `#c2410c` claro / `#ff8a3d` oscuro), **Artesanos grafito** (degradado gris oscuro).
+- Fuentes: **Inter** (texto y cifras grandes) y **Geist Mono** (medidas, números de lote).
+- Botón de WhatsApp verde.
+- Ícono de la app: perfil de aluminio con línea de corte azul (`public/icono-*.png`). El botón "Agregar a la pantalla de inicio" sale solo en Lotes y una sola vez por teléfono.
 
 ## 10. Calidad
 - Lógica de cálculo en módulos puros con **pruebas automáticas** (incluye el caso de prueba de la sección 3). Las pruebas corren en GitHub en cada cambio; si fallan, no se publica.

@@ -5,6 +5,18 @@
 type EventoInstalar = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
 
 let pendiente: EventoInstalar | null = null;
+
+// Se recuerda en el teléfono que la app ya se agregó al inicio, para no volver
+// a mostrar el botón nunca más (ni abriéndola desde el navegador).
+const MARCA = 'cortes-anclada';
+function leerMarca() {
+  try { return localStorage.getItem(MARCA) === '1'; } catch { return false; }
+}
+export function marcarAnclada() {
+  try { localStorage.setItem(MARCA, '1'); } catch { /* sin almacenamiento */ }
+  pendiente = null;
+  avisar();
+}
 const avisos = new Set<() => void>();
 const avisar = () => avisos.forEach((f) => f());
 
@@ -14,10 +26,12 @@ export function iniciarInstalacion() {
     pendiente = e as EventoInstalar;
     avisar();
   });
-  window.addEventListener('appinstalled', () => {
-    pendiente = null;
-    avisar();
-  });
+  window.addEventListener('appinstalled', marcarAnclada);
+  // Si se abrió desde el ícono, ya está agregada.
+  if (abiertaDesdeIcono()) marcarAnclada();
+  // Android/Chrome: preguntar al teléfono si la app ya está instalada.
+  const nav = navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
+  nav.getInstalledRelatedApps?.().then((apps) => { if (apps.length) marcarAnclada(); }).catch(() => {});
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -30,9 +44,13 @@ export const escucharInstalacion = (f: () => void) => {
   return () => { avisos.delete(f); };
 };
 
-/** ¿Ya se abrió desde el ícono de la pantalla de inicio? */
-export function yaAnclada() {
+function abiertaDesdeIcono() {
   return window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+/** ¿Ya está agregada al inicio (o se abrió desde el ícono)? */
+export function yaAnclada() {
+  return abiertaDesdeIcono() || leerMarca();
 }
 
 export function esIphone() {
@@ -55,6 +73,7 @@ export async function anclarDirecto() {
   pendiente = null;
   await ev.prompt();
   const r = await ev.userChoice;
-  avisar();
+  if (r.outcome === 'accepted') marcarAnclada();
+  else avisar();
   return r.outcome === 'accepted';
 }

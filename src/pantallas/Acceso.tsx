@@ -5,7 +5,6 @@ import { useSesion, aplicarApariencia } from '../sesion.tsx';
 import { api, MODO_DEMO, type Slug } from '../datos/index.ts';
 import { Atras, Flecha, Ojo, Ventana } from '../componentes/iconos.tsx';
 import { ErrorCaja } from '../componentes/comunes.tsx';
-import { AgregarInicio } from '../componentes/AgregarInicio.tsx';
 
 const HERRERIAS: { slug: Slug; nombre: string; letra: string }[] = [
   { slug: 'famoso', nombre: 'Famoso', letra: 'F' },
@@ -54,7 +53,6 @@ export function Inicio() {
           </Link>
         ))}
       </div>
-      <AgregarInicio />
       <p className="ayuda" style={{ textAlign: 'center', marginTop: 'auto' }}>
         Cada herrería tiene sus propios lotes y usuarios.
         {MODO_DEMO && <><br /><strong>Modo demostración:</strong> usuario raymundo o pedro, clave demo123.</>}

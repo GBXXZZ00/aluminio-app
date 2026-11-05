@@ -6,6 +6,7 @@ import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtDinero, fmtFecha, fmtLote } from '../calculos/index.ts';
 import { CampoNumero, Cargando, Encabezado, ErrorCaja, Modal } from '../componentes/comunes.tsx';
 import { Basura, Candado, Chat, Flecha, Mas } from '../componentes/iconos.tsx';
+import { BarraNav } from '../componentes/BarraNav.tsx';
 
 function TablaResumen({ r }: { r: Resumen }) {
   const filas: [string, number, boolean?][] = [
@@ -105,20 +106,24 @@ export function Finanzas() {
 
   if (!sesion) return null;
   return (
-    <main className="pantalla">
+    <main className="pantalla con-barra">
       <Encabezado volver="/lotes" titulo="Finanzas"
         sub={<><span className="acento">Herrería {sesion.herreria.nombre}</span>{r?.periodo_desde ? ` · período abierto desde ${fmtFecha(new Date(r.periodo_desde))}` : ''}</>} />
       <ErrorCaja mensaje={error} />
       {!r && !error && <Cargando />}
       {r && (
         <>
-          <div className="tarjeta" style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="etiqueta-seccion">Ganancia del período</span>
-            <span className="grande-num">{fmtDinero(r.ganancia)}</span>
-            <span className="sec" style={{ fontSize: 13 }}>
+          <section className="hero" aria-label="Ganancia del período">
+            <span className="hero-etq">Ganancia del período</span>
+            <span className="hero-num">{fmtDinero(r.ganancia)}</span>
+            <span className="hero-sub">
               {r.cantidad_lotes} {r.cantidad_lotes === 1 ? 'lote abierto' : 'lotes abiertos'} · {r.cantidad_ventanas} {r.cantidad_ventanas === 1 ? 'ventana' : 'ventanas'}
             </span>
-          </div>
+            <div className="hero-pie">
+              <span>Vendido</span>
+              <span className="cifra">{fmtDinero(r.total_vendido)}</span>
+            </div>
+          </section>
           <TablaResumen r={r} />
           <span className="etiqueta-seccion">Lotes abiertos</span>
           <TablaLotes r={r} />
@@ -158,6 +163,7 @@ export function Finanzas() {
           </Link>
         </>
       )}
+      <BarraNav />
     </main>
   );
 }
@@ -293,7 +299,7 @@ export function Cierres() {
   }, []);
   if (!sesion) return null;
   return (
-    <main className="pantalla">
+    <main className="pantalla con-barra">
       <Encabezado volver="/lotes" titulo="Cierres" sub={`Herrería ${sesion.herreria.nombre}`} />
       <ErrorCaja mensaje={error} />
       {!lista && !error && <Cargando />}
@@ -328,6 +334,7 @@ export function Cierres() {
           )}
         </div>
       ))}
+      <BarraNav />
     </main>
   );
 }
