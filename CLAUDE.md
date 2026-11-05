@@ -110,7 +110,7 @@ Goma vidrio 4 mm: 2 kg
 (▪️ para negro, ▫️ para blanco.) Botones: Enviar por WhatsApp, Copiar texto, Descargar PDF.
 
 ## 7. CSV para CutList Optimizer
-Solo **vidrios**, un archivo: `Length,Width,Qty,Label` → alto, ancho, cantidad, `V1 Ecobel`.
+Solo **vidrios**, un archivo: `Length,Width,Qty,Label` → alto, ancho, cantidad y **etiqueta vacía** (decisión del dueño: en CutList no debe salir el nombre de la ventana).
 
 ## 8. Finanzas
 - **Precio:** área = alto × ancho **originales** / 10 000. Precio por m² sugerido: Ecobel **$100**, Panorámico **$90** — **oculto** (no se muestra). Se ven y editan **precio unitario** y **precio total**: cambiar uno recalcula el otro (total = unitario × cantidad). Al cambiar la cantidad se mantiene el unitario.
