@@ -1,13 +1,18 @@
-// Pantalla de un lote: cliente, ventanas con precios, dinero del lote.
+// Pantalla de un lote, en tres vistas:
+// - "menu": resumen, cliente y dos opciones grandes (Ventanas y Gastos).
+// - "ventanas": lista de ventanas para ver, agregar, editar o borrar.
+// - "gastos": perfilería de aluminio y vidrio del lote, con la ganancia.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, claveGastos, claveLote, enMemoria, type Gastos, type Lote as TLote, type VentanaFila } from '../datos/index.ts';
 import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtDinero, fmtFecha, fmtLote, medidasTrabajo, NOMBRE_SISTEMA, r2 } from '../calculos/index.ts';
 import { CampoNumero, Cargando, Encabezado, ErrorCaja, Modal } from '../componentes/comunes.tsx';
-import { Basura, Lapiz, Mas } from '../componentes/iconos.tsx';
+import { Basura, Billete, Flecha, Lapiz, Mas, VentanaChica } from '../componentes/iconos.tsx';
 
-export function Lote() {
+export type VistaLote = 'menu' | 'ventanas' | 'gastos';
+
+export function Lote({ vista = 'menu' }: { vista?: VistaLote }) {
   const { id } = useParams();
   const { sesion, avisar } = useSesion();
   const permisos = usePermisos();
@@ -88,32 +93,24 @@ export function Lote() {
     }
   }
 
-  return (
-    <main className="pantalla">
-      <Encabezado
-        volver={cerrado ? '/cierres' : '/lotes'}
-        titulo={<span className="mono">Lote {fmtLote(lote.numero)}</span>}
-        sub={`Herrería ${sesion.herreria.nombre} · creado ${fmtFecha(new Date(lote.creado_en))}`}
-      />
-      {cerrado && <div className="aviso info">Este lote ya pasó por un cierre general. Solo se puede consultar.</div>}
+  const modalBorrar = borrar && (
+        <Modal titulo="¿Eliminar esta ventana?" onCerrar={() => setBorrar(null)}>
+          <p className="ayuda">{borrar.cantidad} × {NOMBRE_SISTEMA[borrar.sistema]} de {borrar.alto} × {borrar.ancho} cm.</p>
+          <button type="button" className="btn peligro" onClick={confirmarBorrar}>Sí, eliminar</button>
+          <button type="button" className="btn secundario" onClick={() => setBorrar(null)}>Cancelar</button>
+        </Modal>
+  );
 
-      <section className="hero" aria-label="Resumen del lote">
-        <span className="hero-etq">{permisos.finanzas ? 'Venta del lote' : 'Ventanas del lote'}</span>
-        <span className="hero-num">{permisos.finanzas ? fmtDinero(venta) : unidades}</span>
-        <span className="hero-sub">{lote.cliente || 'Sin cliente'}</span>
-        <div className="hero-pie">
-          <span>{unidades} {unidades === 1 ? 'ventana' : 'ventanas'}</span>
-          {permisos.finanzas ? <span className="cifra">Ganancia {fmtDinero(venta - totalGastos)}</span> : <span>{ventanas.length} {ventanas.length === 1 ? 'medida' : 'medidas'}</span>}
-        </div>
-      </section>
-      <ErrorCaja mensaje={error} />
+  const titulo = <span className="mono">Lote {fmtLote(lote.numero)}</span>;
+  const avisoCerrado = cerrado && <div className="aviso info">Este lote ya pasó por un cierre general. Solo se puede consultar.</div>;
 
-      <div className="campo">
-        <label htmlFor="cliente">Cliente u obra (opcional)</label>
-        <input id="cliente" className="entrada" maxLength={80} value={cliente} disabled={cerrado}
-          onChange={(e) => setCliente(e.target.value)} onBlur={guardarCliente} />
-      </div>
-
+  // ---------------- Vista: Ventanas ----------------
+  if (vista === 'ventanas') {
+    return (
+      <main className="pantalla">
+        <Encabezado volver={`/lote/${lote.id}`} titulo="Ventanas" sub={<>{titulo} · {lote.cliente || 'Sin cliente'}</>} />
+        {avisoCerrado}
+        <ErrorCaja mensaje={error} />
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span className="etiqueta-seccion">Ventanas</span>
         <span className="sec" style={{ fontSize: 13 }}>{unidades} {unidades === 1 ? 'unidad' : 'unidades'}</span>
@@ -153,9 +150,18 @@ export function Lote() {
         )}
       </div>
 
-      {permisos.finanzas && (
-        <>
-          <span className="etiqueta-seccion">Dinero del lote</span>
+      {modalBorrar}
+      </main>
+    );
+  }
+
+  // ---------------- Vista: Gastos ----------------
+  if (vista === 'gastos') {
+    return (
+      <main className="pantalla">
+        <Encabezado volver={`/lote/${lote.id}`} titulo="Gastos del lote" sub={<>{titulo} · {lote.cliente || 'Sin cliente'}</>} />
+        {avisoCerrado}
+        <ErrorCaja mensaje={error} />
           <div className="tarjeta pad pila">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ fontWeight: 600 }}>Venta del lote</span>
@@ -183,20 +189,64 @@ export function Lote() {
               <span className="mono acento" style={{ fontSize: 26, fontWeight: 600 }}>{fmtDinero(venta - totalGastos)}</span>
             </div>
           </div>
-        </>
-      )}
+        <p className="ayuda">Los gastos se guardan solos al salir de cada casilla.</p>
+      </main>
+    );
+  }
+
+  // ---------------- Vista: menú del lote ----------------
+  return (
+    <main className="pantalla">
+      <Encabezado
+        volver={cerrado ? '/cierres' : '/lotes'}
+        titulo={titulo}
+        sub={`Herrería ${sesion.herreria.nombre} · creado ${fmtFecha(new Date(lote.creado_en))}`}
+      />
+      {avisoCerrado}
+
+      <section className="hero" aria-label="Resumen del lote">
+        <span className="hero-etq">{permisos.finanzas ? 'Venta del lote' : 'Ventanas del lote'}</span>
+        <span className="hero-num">{permisos.finanzas ? fmtDinero(venta) : unidades}</span>
+        <span className="hero-sub">{lote.cliente || 'Sin cliente'}</span>
+        <div className="hero-pie">
+          <span>{unidades} {unidades === 1 ? 'ventana' : 'ventanas'}</span>
+          {permisos.finanzas ? <span className="cifra">Ganancia {fmtDinero(venta - totalGastos)}</span> : <span>{ventanas.length} {ventanas.length === 1 ? 'medida' : 'medidas'}</span>}
+        </div>
+      </section>
+      <ErrorCaja mensaje={error} />
+
+      <div className="campo">
+        <label htmlFor="cliente">Cliente u obra (opcional)</label>
+        <input id="cliente" className="entrada" maxLength={80} value={cliente} disabled={cerrado}
+          onChange={(e) => setCliente(e.target.value)} onBlur={guardarCliente} />
+      </div>
+
+      <div className="opciones-lote">
+        <Link to={`/lote/${lote.id}/ventanas`} className="opcion-lote">
+          <span className="circulo"><VentanaChica /></span>
+          <span className="txt">
+            <span className="nombre">Ventanas</span>
+            <span className="detalle">{ventanas.length ? `${unidades} ${unidades === 1 ? 'ventana' : 'ventanas'} · ver y modificar` : 'Agrega la primera ventana'}</span>
+          </span>
+          {permisos.finanzas && <span className="valor">{fmtDinero(venta)}</span>}
+          <span className="sec"><Flecha /></span>
+        </Link>
+        {permisos.finanzas && (
+          <Link to={`/lote/${lote.id}/gastos`} className="opcion-lote">
+            <span className="circulo"><Billete /></span>
+            <span className="txt">
+              <span className="nombre">Gastos</span>
+              <span className="detalle">{totalGastos ? 'Perfilería y vidrio' : 'Agrega perfilería y vidrio'}</span>
+            </span>
+            <span className="valor">{totalGastos ? `−${fmtDinero(totalGastos)}` : '$0'}</span>
+            <span className="sec"><Flecha /></span>
+          </Link>
+        )}
+      </div>
 
       <button type="button" className="btn primario" disabled={!ventanas.length} onClick={() => nav(`/lote/${lote.id}/resultados`)}>
         Ver cortes y compra
       </button>
-
-      {borrar && (
-        <Modal titulo="¿Eliminar esta ventana?" onCerrar={() => setBorrar(null)}>
-          <p className="ayuda">{borrar.cantidad} × {NOMBRE_SISTEMA[borrar.sistema]} de {borrar.alto} × {borrar.ancho} cm.</p>
-          <button type="button" className="btn peligro" onClick={confirmarBorrar}>Sí, eliminar</button>
-          <button type="button" className="btn secundario" onClick={() => setBorrar(null)}>Cancelar</button>
-        </Modal>
-      )}
     </main>
   );
 }

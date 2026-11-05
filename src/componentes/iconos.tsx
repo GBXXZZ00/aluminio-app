@@ -15,6 +15,8 @@ export const Grafica = () => <svg {...base}><path d="M4 19V9M10 19V5M16 19v-7M22
 export const Flecha = () => <svg {...base}><path d="M9 6l6 6-6 6" /></svg>;
 export const Archivo = () => <svg {...base}><rect x="3" y="4" width="18" height="5" rx="1" /><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4" /></svg>;
 export const Capas = () => <svg {...base}><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>;
+export const VentanaChica = () => <svg {...base} width={24} height={24}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M12 3v18M4 12h16" /></svg>;
+export const Billete = () => <svg {...base} width={24} height={24}><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5v5M18 9.5v5" /></svg>;
 export const Candado = () => <svg {...base}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>;
 export const Ojo = () => <svg {...base}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 export const Descargar = () => <svg {...base} width={20} height={20}><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>;
