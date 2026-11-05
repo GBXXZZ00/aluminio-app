@@ -41,6 +41,8 @@ function Rutas() {
       <Route path="/clave" element={<CambiarClave />} />
       <Route path="/lotes" element={<Protegida><Historial /></Protegida>} />
       <Route path="/lote/:id" element={<Protegida><Lote /></Protegida>} />
+      <Route path="/lote/:id/ventanas" element={<Protegida><Lote vista="ventanas" /></Protegida>} />
+      <Route path="/lote/:id/gastos" element={<Protegida requiere="finanzas"><Lote vista="gastos" /></Protegida>} />
       <Route path="/lote/:id/ventana/:vid" element={<Protegida><VentanaForm /></Protegida>} />
       <Route path="/lote/:id/resultados" element={<Protegida><Resultados /></Protegida>} />
       <Route path="/finanzas" element={<Protegida requiere="finanzas"><Finanzas /></Protegida>} />

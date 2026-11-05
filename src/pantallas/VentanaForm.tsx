@@ -10,6 +10,13 @@ import {
 import { CampoNumero, Cargando, ErrorCaja } from '../componentes/comunes.tsx';
 import { Cerrar } from '../componentes/iconos.tsx';
 
+/** Vuelve a la lista de ventanas sin dejar pantallas repetidas en el historial. */
+function volverALista(nav: ReturnType<typeof useNavigate>, loteId: string) {
+  const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+  if (idx > 0) nav(-1);
+  else nav(`/lote/${loteId}/ventanas`, { replace: true });
+}
+
 export function VentanaForm() {
   const { id: loteId, vid } = useParams();
   const editar = vid && vid !== 'nueva';
@@ -39,7 +46,7 @@ export function VentanaForm() {
       setEtiqueta(`V${i + 1}`);
       if (editar) {
         const v = ventanas[i] as VentanaFila | undefined;
-        if (!v) { nav(`/lote/${loteId}`, { replace: true }); return; }
+        if (!v) { nav(`/lote/${loteId}/ventanas`, { replace: true }); return; }
         setCantidad(v.cantidad); setSistema(v.sistema); setColor(v.color);
         setAlto(v.alto); setAncho(v.ancho); setProteccion(v.proteccion);
         setUnitario(v.precio_unitario); setTotal(v.precio_total);
@@ -81,7 +88,7 @@ export function VentanaForm() {
         precio_unitario: unitario, precio_total: total,
       });
       avisar(editar ? 'Ventana actualizada' : 'Ventana agregada');
-      nav(`/lote/${loteId}`, { replace: true });
+      volverALista(nav, loteId!);
     } catch (e) {
       setError((e as Error).message);
       setGuardando(false);
@@ -105,7 +112,7 @@ export function VentanaForm() {
   return (
     <main className="pantalla">
       <header className="encabezado">
-        <button type="button" className="icono-btn" aria-label="Cerrar sin guardar" onClick={() => nav(`/lote/${loteId}`)}><Cerrar /></button>
+        <button type="button" className="icono-btn" aria-label="Cerrar sin guardar" onClick={() => volverALista(nav, loteId!)}><Cerrar /></button>
         <div className="titulo">
           <h1>{editar ? 'Editar ventana' : 'Agregar ventana'}</h1>
           <div className="sub">Lote {fmtLote(numLote)} · {etiqueta}</div>

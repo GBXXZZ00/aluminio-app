@@ -133,6 +133,16 @@ a { color: var(--acento); }
 .accion.principal .circulo { background: var(--boton); color: var(--boton-texto); border-color: transparent; }
 .accion:active .circulo { transform: scale(.94); }
 
+/* Opciones grandes dentro de un lote (Ventanas / Gastos). */
+.opciones-lote { display: flex; flex-direction: column; gap: 12px; }
+.opcion-lote { display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 16px; border-radius: 22px; background: var(--tarjeta); border: 1px solid var(--borde); box-shadow: var(--sombra); color: var(--texto); text-decoration: none; transition: transform .12s ease-out; }
+.opcion-lote:active { transform: scale(.98); }
+.opcion-lote .circulo { width: 52px; height: 52px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--acento-fondo); color: var(--acento); }
+.opcion-lote .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.opcion-lote .nombre { font-size: 18px; font-weight: 700; }
+.opcion-lote .detalle { font-size: 14px; color: var(--texto-2); }
+.opcion-lote .valor { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 /* ============ Botones ============ */
 .btn { min-height: 54px; border: none; border-radius: 16px; padding: 0 16px; font-size: 16px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent; }
 .btn { transition: transform .12s ease-out; }
@@ -228,5 +238,5 @@ a { color: var(--acento); }
   .encabezado, .barra-nav, .modal, .menu { background: var(--tarjeta); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .btn, .accion .circulo, .interruptor span, .barra-nav a { transition: none; }
+  .btn, .accion .circulo, .interruptor span, .barra-nav a, .opcion-lote { transition: none; }
 }
