@@ -34,13 +34,11 @@ export function textoWhatsApp(numeroLote: number, fecha: Date, r: ResultadoLote)
   return lineas.join('\n');
 }
 
-const SISTEMA_ASCII: Record<Sistema, string> = { ecobel: 'Ecobel', panoramico: 'Panoramico' };
-
-/** CSV de vidrios: Length,Width,Qty,Label (alto, ancho, cantidad, "V1 Ecobel"). */
+/** CSV de vidrios: Length,Width,Qty,Label (alto, ancho, cantidad, etiqueta VACÍA a pedido del dueño). */
 export function csvVidrios(r: ResultadoLote): string {
   const filas = ['Length,Width,Qty,Label'];
   for (const v of r.vidrios) {
-    filas.push(`${fmtCm(v.alto)},${fmtCm(v.ancho)},${v.cantidad},${v.etiqueta} ${SISTEMA_ASCII[v.sistema]}`);
+    filas.push(`${fmtCm(v.alto)},${fmtCm(v.ancho)},${v.cantidad},`);
   }
   return filas.join('\n') + '\n';
 }

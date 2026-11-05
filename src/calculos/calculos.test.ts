@@ -148,7 +148,7 @@ test('CSV para CutList Optimizer', () => {
   const r = calcularLote(lote004);
   assert.equal(
     csvVidrios(r),
-    'Length,Width,Qty,Label\n108.5,70.4,4,V1 Ecobel\n137.5,88.3,2,V2 Panoramico\n',
+    'Length,Width,Qty,Label\n108.5,70.4,4,\n137.5,88.3,2,\n',
   );
 });
 
