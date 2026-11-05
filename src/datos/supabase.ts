@@ -1,7 +1,7 @@
 // Conexión real con Supabase.
 // La llave "publishable" es pública por diseño: la seguridad la ponen las
 // reglas RLS de la base de datos, no esta llave.
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, processLock, type SupabaseClient } from '@supabase/supabase-js';
 import type {
   Api, CambiosUsuario, Cierre, Gastos, Lote, ManoObra, Perfil, Resumen, Sesion, Slug, Tema,
   UsuarioNuevo, VentanaFila,
@@ -17,11 +17,26 @@ const NO_GUARDADO = 'No se guardó: el lote ya fue cerrado o no tienes permiso. 
 function falla(e: { message?: string } | null | undefined, porDefecto = 'Algo salió mal. Revisa tu conexión e inténtalo de nuevo.'): never {
   const m = e?.message ?? '';
   if (/Failed to fetch|NetworkError|network|Load failed/i.test(m)) throw new Error('Sin conexión a internet.');
+  if (/abort/i.test(m)) throw new Error('La conexión está muy lenta. Inténtalo de nuevo.');
   if (/row-level security|permission denied/i.test(m)) throw new Error('No tienes permiso para hacer esto.');
   throw new Error(m && /[áéíóúñ¿]|^[A-ZÁÉÍÓÚ][a-záéíóú]+ /.test(m) ? m : porDefecto);
 }
 
 const n = (x: unknown) => Number(x ?? 0);
+
+/** Tiempo máximo de espera por pedido: con mala señal, mejor avisar que quedarse pegada. */
+const LIMITE_MS = 20_000;
+
+function fetchConLimite(entrada: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const reloj = setTimeout(() => ctrl.abort(), LIMITE_MS);
+  const externa = init?.signal;
+  if (externa) {
+    if (externa.aborted) ctrl.abort();
+    else externa.addEventListener('abort', () => ctrl.abort(), { once: true });
+  }
+  return fetch(entrada, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(reloj));
+}
 
 function aLote(f: Record<string, unknown>): Lote {
   const ventanas = f.ventanas as { cantidad: number }[] | undefined;
@@ -78,15 +93,21 @@ function aResumen(j: Record<string, unknown>): Resumen {
 
 export function crearApiSupabase(): Api {
   const sb: SupabaseClient = createClient(URL_SUPABASE, LLAVE, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    // processLock: el candado del navegador (navigator.locks) a veces se traba en
+    // Android al volver a la app y deja todos los pedidos esperando para siempre.
+    auth: { persistSession: true, autoRefreshToken: true, lock: processLock },
+    global: { fetch: fetchConLimite },
   });
 
   async function cargarSesion(): Promise<Sesion | null> {
     const { data } = await sb.auth.getSession();
     const uid = data.session?.user.id;
     if (!uid) return null;
-    const { data: perfil, error: e1 } = await sb.from('perfiles').select('*').eq('id', uid).maybeSingle();
-    const { data: herreria, error: e2 } = await sb.from('herrerias').select('id, slug, nombre').maybeSingle();
+    // Los dos pedidos van a la vez, no uno detrás del otro.
+    const [{ data: perfil, error: e1 }, { data: herreria, error: e2 }] = await Promise.all([
+      sb.from('perfiles').select('*').eq('id', uid).maybeSingle(),
+      sb.from('herrerias').select('id, slug, nombre').maybeSingle(),
+    ]);
     // Un fallo de red NO es lo mismo que "no hay sesión": se avisa para reintentar.
     if (e1 || e2) throw new Error('Sin conexión. Revisa tu internet e inténtalo de nuevo.');
     if (!perfil || !herreria || !perfil.activo) return null;
@@ -156,11 +177,13 @@ export function crearApiSupabase(): Api {
       await sb.from('perfiles').update({ tema }).eq('id', uid);
     },
 
-    async listarLotes() {
-      const { data, error } = await sb
+    async listarLotes(soloAbiertos = false) {
+      let q = sb
         .from('lotes')
         .select('id, numero, cliente, disco_corte, creado_en, cierre_id, ventanas(cantidad)')
         .order('numero', { ascending: false });
+      if (soloAbiertos) q = q.is('cierre_id', null);
+      const { data, error } = await q;
       if (error) falla(error);
       return (data ?? []).map(aLote);
     },
@@ -176,14 +199,13 @@ export function crearApiSupabase(): Api {
     },
 
     async obtenerLote(id) {
-      const { data: lote, error } = await sb
-        .from('lotes')
-        .select('id, numero, cliente, disco_corte, creado_en, cierre_id')
-        .eq('id', id)
-        .maybeSingle();
+      // Lote y ventanas a la vez.
+      const [{ data: lote, error }, { data: v, error: e2 }] = await Promise.all([
+        sb.from('lotes').select('id, numero, cliente, disco_corte, creado_en, cierre_id').eq('id', id).maybeSingle(),
+        sb.from('ventanas').select('*').eq('lote_id', id).order('orden').order('creado_en'),
+      ]);
       if (error) falla(error);
       if (!lote) throw new Error('Este lote no existe o fue eliminado.');
-      const { data: v, error: e2 } = await sb.from('ventanas').select('*').eq('lote_id', id).order('orden').order('creado_en');
       if (e2) falla(e2);
       return { lote: aLote(lote), ventanas: (v ?? []).map(aVentana) };
     },

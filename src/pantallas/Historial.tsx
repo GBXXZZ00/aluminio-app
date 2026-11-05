@@ -1,7 +1,7 @@
 // Historial de lotes de la herrería.
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, type Lote } from '../datos/index.ts';
+import { api, claveLotes, enMemoria, type Lote } from '../datos/index.ts';
 import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtFecha, fmtLote } from '../calculos/index.ts';
 import { Cargando, ErrorCaja, Modal } from '../componentes/comunes.tsx';
@@ -12,7 +12,8 @@ export function Historial() {
   const { sesion, salir, cambiarTema, avisar } = useSesion();
   const permisos = usePermisos();
   const nav = useNavigate();
-  const [lotes, setLotes] = useState<Lote[] | null>(null);
+  // Se muestra al instante lo último que se vio; luego se actualiza.
+  const [lotes, setLotes] = useState<Lote[] | null>(() => enMemoria<Lote[]>(claveLotes(true)) ?? null);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [nuevo, setNuevo] = useState(false);
@@ -25,7 +26,7 @@ export function Historial() {
     try {
       setError(null);
       // Los lotes cerrados no se muestran aquí: viven en el módulo "Cierres".
-      setLotes((await api.listarLotes()).filter((l) => !l.cierre_id));
+      setLotes(await api.listarLotes(true));
     } catch (e) {
       setError((e as Error).message);
     }

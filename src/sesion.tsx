@@ -1,5 +1,5 @@
 // Estado de la sesión: quién entró, a qué herrería, y su tema.
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, type Sesion, type Slug, type Tema } from './datos/index.ts';
 
 interface Ctx {
@@ -67,7 +67,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     reloj.current = window.setTimeout(() => setToast(null), 2600);
   }, []);
 
-  const valor: Ctx = {
+  // Se memoriza para que un aviso en pantalla no redibuje toda la app.
+  const valor = useMemo<Ctx>(() => ({
     sesion,
     cargando,
     sinConexion,
@@ -89,7 +90,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       setSesion({ ...sesion, perfil: { ...sesion.perfil, tema } });
       api.guardarTema(tema).catch(() => {});
     },
-  };
+  }), [sesion, cargando, sinConexion, refrescar, avisar]);
 
   return (
     <SesionCtx.Provider value={valor}>

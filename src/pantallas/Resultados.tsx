@@ -1,7 +1,7 @@
 // Resultados del lote en 3 pestañas: Perfiles, Vidrios y Compra.
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { api, type Lote, type VentanaFila } from '../datos/index.ts';
+import { api, claveLote, enMemoria, type Lote, type VentanaFila } from '../datos/index.ts';
 import { useSesion } from '../sesion.tsx';
 import {
   calcularLote, csvVidrios, fmtCm, fmtFecha, fmtKg, fmtLote, NOMBRE_SISTEMA, textoWhatsApp,
@@ -19,9 +19,10 @@ export function Resultados() {
   const [params, setParams] = useSearchParams();
   const pestana = (params.get('ver') as Pestana) || 'perfiles';
   const { sesion, avisar } = useSesion();
-  const [lote, setLote] = useState<Lote | null>(null);
-  const [filas, setFilas] = useState<VentanaFila[]>([]);
-  const [disco, setDisco] = useState(0.3);
+  const previo = enMemoria<{ lote: Lote; ventanas: VentanaFila[] }>(claveLote(id!));
+  const [lote, setLote] = useState<Lote | null>(previo?.lote ?? null);
+  const [filas, setFilas] = useState<VentanaFila[]>(previo?.ventanas ?? []);
+  const [disco, setDisco] = useState(previo?.lote.disco_corte ?? 0.3);
   const [error, setError] = useState<string | null>(null);
   const [verBarras, setVerBarras] = useState<string | null>(null);
 

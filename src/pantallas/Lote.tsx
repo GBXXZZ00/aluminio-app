@@ -1,7 +1,7 @@
 // Pantalla de un lote: cliente, ventanas con precios, dinero del lote.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, type Gastos, type Lote as TLote, type VentanaFila } from '../datos/index.ts';
+import { api, claveGastos, claveLote, enMemoria, type Gastos, type Lote as TLote, type VentanaFila } from '../datos/index.ts';
 import { usePermisos, useSesion } from '../sesion.tsx';
 import { fmtDinero, fmtFecha, fmtLote, medidasTrabajo, NOMBRE_SISTEMA, r2 } from '../calculos/index.ts';
 import { CampoNumero, Cargando, Encabezado, ErrorCaja, Modal } from '../componentes/comunes.tsx';
@@ -12,10 +12,12 @@ export function Lote() {
   const { sesion, avisar } = useSesion();
   const permisos = usePermisos();
   const nav = useNavigate();
-  const [lote, setLote] = useState<TLote | null>(null);
-  const [ventanas, setVentanas] = useState<VentanaFila[]>([]);
-  const [gastos, setGastos] = useState<Gastos>({ perfileria: 0, vidrio: 0 });
-  const [cliente, setCliente] = useState('');
+  // Lo último que se vio de este lote aparece al instante; luego se actualiza.
+  const previo = enMemoria<{ lote: TLote; ventanas: VentanaFila[] }>(claveLote(id!));
+  const [lote, setLote] = useState<TLote | null>(previo?.lote ?? null);
+  const [ventanas, setVentanas] = useState<VentanaFila[]>(previo?.ventanas ?? []);
+  const [gastos, setGastos] = useState<Gastos>(() => enMemoria<Gastos>(claveGastos(id!)) ?? { perfileria: 0, vidrio: 0 });
+  const [cliente, setCliente] = useState(previo?.lote.cliente ?? '');
   const [error, setError] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<VentanaFila | null>(null);
   // Los guardados de gastos van en fila, uno detrás de otro (nunca dos a la vez).
@@ -26,11 +28,15 @@ export function Lote() {
   const cargar = useCallback(async () => {
     try {
       setError(null);
-      const r = await api.obtenerLote(id!);
+      // Lote y gastos se piden a la vez.
+      const [r, g] = await Promise.all([
+        api.obtenerLote(id!),
+        permisos.finanzas ? api.obtenerGastos(id!) : Promise.resolve(null),
+      ]);
       setLote(r.lote);
       setVentanas(r.ventanas);
       setCliente(r.lote.cliente ?? '');
-      if (permisos.finanzas) setGastos(await api.obtenerGastos(id!));
+      if (g) setGastos(g);
     } catch (e) {
       setLote(null);
       setError((e as Error).message);
