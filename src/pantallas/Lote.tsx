@@ -96,6 +96,16 @@ export function Lote() {
         sub={`Herrería ${sesion.herreria.nombre} · creado ${fmtFecha(new Date(lote.creado_en))}`}
       />
       {cerrado && <div className="aviso info">Este lote ya pasó por un cierre general. Solo se puede consultar.</div>}
+
+      <section className="hero" aria-label="Resumen del lote">
+        <span className="hero-etq">{permisos.finanzas ? 'Venta del lote' : 'Ventanas del lote'}</span>
+        <span className="hero-num">{permisos.finanzas ? fmtDinero(venta) : unidades}</span>
+        <span className="hero-sub">{lote.cliente || 'Sin cliente'}</span>
+        <div className="hero-pie">
+          <span>{unidades} {unidades === 1 ? 'ventana' : 'ventanas'}</span>
+          {permisos.finanzas ? <span className="cifra">Ganancia {fmtDinero(venta - totalGastos)}</span> : <span>{ventanas.length} {ventanas.length === 1 ? 'medida' : 'medidas'}</span>}
+        </div>
+      </section>
       <ErrorCaja mensaje={error} />
 
       <div className="campo">

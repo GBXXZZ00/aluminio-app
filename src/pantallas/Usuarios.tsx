@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type Perfil } from '../datos/index.ts';
 import { useSesion } from '../sesion.tsx';
 import { Cargando, Encabezado, ErrorCaja, Interruptor, Modal } from '../componentes/comunes.tsx';
+import { BarraNav } from '../componentes/BarraNav.tsx';
 import { Candado, Lapiz } from '../componentes/iconos.tsx';
 
 const permisosTexto = (p: Perfil) =>
@@ -50,7 +51,7 @@ export function Usuarios() {
   }
 
   return (
-    <main className="pantalla">
+    <main className="pantalla con-barra">
       <Encabezado volver="/lotes" titulo="Usuarios" sub={<span className="acento">Herrería {sesion.herreria.nombre}</span>} />
       <ErrorCaja mensaje={error} />
       {!lista && !error && <Cargando />}
@@ -112,6 +113,7 @@ export function Usuarios() {
 
       {editar && <EditarUsuario p={editar} onCerrar={() => setEditar(null)} onGuardado={() => { setEditar(null); cargar(); }} />}
       {claveModal && <ClaveCierre onCerrar={() => setClaveModal(false)} onGuardado={() => { setClaveModal(false); setTieneClave(true); avisar('Clave de cierre guardada'); }} />}
+      <BarraNav />
     </main>
   );
 }
