@@ -1,5 +1,5 @@
-import * as L from './logic.js';
-import * as API from './api.js';
+import * as L from './logic.js?v=2';
+import * as API from './api.js?v=2';
 
 const store = globalThis.localStorage;
 const $app = () => document.getElementById('app');
@@ -23,15 +23,15 @@ function leerCache() { try { const c = JSON.parse(store.getItem('gym_cache') || 
 
 function hoy() { const d = ahora(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function info() { return L.infoSemana(hoy(), S.perfil.inicio); }
-function plan() { return L.planSemana(hoy(), S.sesiones, S.perfil.decisiones); }
-function diaDeHoy() { const p = plan(); return p.dias.find(x => x.esHoy).dia; }
+function plan() { return L.planSemana(hoy(), S.sesiones, S.perfil.decisiones, S.perfil.creado || null); }
+function diaDeHoy() { const f = L.iso(hoy()); const elegida = S.sesiones.find(s => s.fecha === f && s.datos && s.datos.elegida); if (elegida) return elegida.dia; const p = plan(); return p.dias.find(x => x.esHoy).dia; }
 function sesionDe(fecha, dia) { return S.sesiones.find(s => s.fecha === fecha && s.dia === dia); }
-function sesionHoy(crear) {
-  const dia = diaDeHoy(); if (!dia) return null;
+function sesionHoy(crear, forzarDia) {
+  const dia = forzarDia || diaDeHoy(); if (!dia) return null;
   const f = L.iso(hoy()); let s = sesionDe(f, dia);
   if (!s && crear) {
     const i = info();
-    s = { fecha: f, dia, ciclo: i.ciclo, semana: i.semana, terminada: false, nota: '', datos: { ex: {}, sep: {}, orden: L.RUTINA[dia].map((_, j) => j), descarga: i.descarga } };
+    s = { fecha: f, dia, ciclo: i.ciclo, semana: i.semana, terminada: false, nota: '', datos: { ex: {}, sep: {}, orden: L.RUTINA[dia].map((_, j) => j), descarga: i.descarga, elegida: !!forzarDia } };
     S.sesiones.unshift(s);
   }
   return s;
@@ -101,7 +101,12 @@ async function refrescar() {
       locales.forEach(l => { if (!sesionDe(l.fecha, l.dia)) S.sesiones.unshift(l); });
       S.medidas = r.medidas || [];
     }
-    if (!S.perfil.inicio) { S.perfil.inicio = L.iso(L.lunesDe(hoy())); guardarPerfil(); }
+    if (!S.perfil.creado) {
+      S.perfil.creado = L.iso(hoy());
+      // Si aún no hay entrenamientos terminados, el ciclo arranca desde el lunes correcto
+      if (!S.perfil.inicio || !S.sesiones.some(s => s.terminada)) S.perfil.inicio = L.iso(L.inicioCiclo(hoy()));
+      guardarPerfil();
+    }
     S.online = true; cache();
     if (S.pantalla === 'inicio' || S.pantalla === 'progreso' || S.pantalla === 'cuerpo') render();
   } catch (e) { S.online = false; render(); }
@@ -140,6 +145,7 @@ export function render() {
   else if (p === 'ajustes') html = vAjustes() + nav('ajustes');
   if (S.hoja) html += vHoja();
   $app().innerHTML = html;
+  const dcSel = document.querySelector('.dcard.sel'); if (dcSel && dcSel.parentElement) { try { dcSel.parentElement.scrollLeft = Math.max(0, dcSel.offsetLeft - 20); } catch (e) {} }
   despierto(p === 'ejercicio');
 }
 
@@ -171,12 +177,13 @@ function vInicio() {
   const pl = plan(); const i = info(); const hoyWd = L.weekday(hoy());
   if (S.sel == null) S.sel = hoyWd;
   const sd = pl.dias.find(x => x.wd === S.sel); const esHoy = S.sel === hoyWd;
-  const ses = sd.dia ? sesionDe(sd.fecha, sd.dia) : null;
-  const total = sd.dia ? L.RUTINA[sd.dia].length : 0;
-  const hechosN = sd.dia && ses ? L.RUTINA[sd.dia].filter(p => L.pasoHecho(p, ses.datos, k => setsDe(k, ses))).length : 0;
+  const dSel = esHoy ? diaDeHoy() : sd.dia;
+  const ses = dSel ? sesionDe(sd.fecha, dSel) : null;
+  const total = dSel ? L.RUTINA[dSel].length : 0;
+  const hechosN = dSel && ses ? L.RUTINA[dSel].filter(p => L.pasoHecho(p, ses.datos, k => setsDe(k, ses))).length : 0;
   const tarjetas = pl.dias.map(x => {
-    const meta = { hecho: 'HECHO', faltaste: 'FALTASTE', saltado: 'SALTADO', movido: 'MOVIDO', descanso: 'DESCANSO', hoy: x.dia ? L.RUTINA[x.dia].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : '', falta: x.dia ? L.RUTINA[x.dia].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : '' }[x.estado];
-    const nombre = x.dia ? L.DIAS[x.dia].nombre : 'Descanso';
+    const meta = { antes: '—', hecho: 'HECHO', faltaste: 'FALTASTE', saltado: 'SALTADO', movido: 'MOVIDO', descanso: 'DESCANSO', hoy: (x.esHoy && diaDeHoy()) ? L.RUTINA[diaDeHoy()].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : x.dia ? L.RUTINA[x.dia].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : '', falta: x.dia ? L.RUTINA[x.dia].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : '' }[x.estado];
+    const xd = x.esHoy ? (diaDeHoy() || x.dia) : x.dia; const nombre = xd ? L.DIAS[xd].nombre : 'Descanso';
     return `<button class="dcard${x.wd === S.sel ? ' sel' : ''}${x.esHoy ? ' hoy' : ''} st-${x.estado}" data-a="dia" data-x="${x.wd}" aria-label="${esc(x.d + ', ' + nombre + ', ' + meta)}">
       <span class="dc-d">${esc(x.d.toUpperCase())}${x.movido ? ' · MOVIDO' : ''}</span><span class="dc-n">${esc(nombre.toUpperCase())}</span><span class="dc-m">${esc(meta)}</span></button>`;
   }).join('');
@@ -186,25 +193,25 @@ function vInicio() {
     else if (i.avisoDescarga) avisos.push(['LA PRÓXIMA SEMANA ES DE DESCARGA', 'Esta semana intenta superar tus pesos. Después tu cuerpo se recupera.']);
     if (i.buscarPesos) avisos.push(['SEMANAS 1 Y 2: ENCUENTRA TUS PESOS', 'Usa RIR 2–3: termina cada serie con 2 o 3 repeticiones de sobra. Toca el peso de cada ejercicio para anotarlo.']);
     if (hoyWd === 1 && !i.buscarPesos) avisos.push(['ES LUNES', 'La semana empieza con la rutina principal, aunque la pasada hayas faltado.']);
-    if (sd.dia && !i.descarga) L.RUTINA[sd.dia].forEach(p => p.ex.forEach(k => { const st = estadoEj(k); if (st && st.trial) avisos.push(['HOY PRUEBAS SUBIR', L.EJ[k].n + ': ' + st.trial.from + ' → ' + st.trial.to + ' ' + st.trial.u + '. A ver qué tal.']); }));
+    if (dSel && !i.descarga) L.RUTINA[dSel].forEach(p => p.ex.forEach(k => { const st = estadoEj(k); if (st && st.trial) avisos.push(['HOY PRUEBAS SUBIR', L.EJ[k].n + ': ' + st.trial.from + ' → ' + st.trial.to + ' ' + st.trial.u + '. A ver qué tal.']); }));
   }
   const falta = esHoy && pl.faltas.length ? pl.faltas[0] : null;
   const puede = falta && L.puedeMover(hoy(), falta, S.perfil.decisiones);
   const dest = falta ? L.destino(L.DIAS[falta].wd) : null;
   let cuerpo = '';
-  if (!sd.dia || (esHoy && S.vista === 'descanso')) {
-    cuerpo = `<div class="card descanso"><div class="h2">DESCANSO</div><p class="sub">${!sd.dia ? (sd.wd === 4 ? 'Opcional: caminata suave de 20–30 min.' : 'Descanso total. Duerme bien y come suficiente proteína.') : 'Hoy descansas. Mañana te pregunto si reacomodamos la semana para no perder este entrenamiento.'}</p></div>`;
+  if (!dSel || (esHoy && S.vista === 'descanso')) {
+    cuerpo = `<div class="card descanso"><div class="h2">DESCANSO</div><p class="sub">${!dSel ? (sd.wd === 4 ? 'Opcional: caminata suave de 20–30 min.' : 'Descanso total. Duerme bien y come suficiente proteína.') : 'Hoy descansas. Mañana te pregunto si reacomodamos la semana para no perder este entrenamiento.'}</p></div>`;
   } else {
     const secs = [];
     const calOpen = !!S.abiertas.cal;
     secs.push(`<section class="sec"><button class="sec-h" data-a="toggle" data-x="cal" aria-expanded="${calOpen}"><span class="bar b-cal"></span><span class="sec-t">CALENTAMIENTO · ${L.CALENTAMIENTO.length}</span><span class="chev${calOpen ? ' up' : ''}"></span></button>
       ${calOpen ? `<div class="sec-b">${L.CALENTAMIENTO.map(c => `<div class="item"><div><div class="it-n">${esc(c.n)}</div><div class="it-d">${esc(c.d)}</div></div></div>`).join('')}</div>` : ''}</section>`);
-    const primerPend = ses ? (ses.datos.orden || []).find(j => !L.pasoHecho(L.RUTINA[sd.dia][j], ses.datos, k => setsDe(k, ses))) : 0;
-    bloques(sd.dia).forEach((b, bi) => {
+    const primerPend = ses ? (ses.datos.orden || []).find(j => !L.pasoHecho(L.RUTINA[dSel][j], ses.datos, k => setsDe(k, ses))) : 0;
+    bloques(dSel).forEach((b, bi) => {
       const key = b.sec + bi; const open = S.abiertas[key] !== false;
-      const n = b.pasos.reduce((a, j) => a + L.RUTINA[sd.dia][j].ex.length, 0);
+      const n = b.pasos.reduce((a, j) => a + L.RUTINA[dSel][j].ex.length, 0);
       const items = b.pasos.map(j => {
-        const p = L.RUTINA[sd.dia][j]; const done = ses && L.pasoHecho(p, ses.datos, k => setsDe(k, ses)); const now = esHoy && !done && j === primerPend;
+        const p = L.RUTINA[dSel][j]; const done = ses && L.pasoHecho(p, ses.datos, k => setsDe(k, ses)); const now = esHoy && !done && j === primerPend;
         const lines = p.ex.map((k, xi) => { const e = L.EJ[k]; const st = estadoEj(k); const sets = L.seriesDe(e, esHoy && i.descarga); const w = st && st.w != null && e.carga !== 'tiempo' ? ' · ' + (esHoy && i.descarga ? L.pesoDescarga(e, st.w, st.u) : st.w) + ' ' + st.u : '';
           return `<div class="it-n">${p.ex.length > 1 ? (xi === 0 ? 'A1 · ' : 'A2 · ') : ''}${esc(nombreEj(k, ses))}</div><div class="it-d">${sets} × ${e.lo}–${e.hi}${e.carga === 'tiempo' ? ' s' : ''}${e.porPierna ? ' por pierna' : ''}${w}</div>`; }).join('');
         return `<div class="item"><div>${p.label ? `<div class="ss-tag">SUPERSERIE ${p.label}</div>` : ''}${lines}</div><span class="st ${done ? 'ok' : now ? 'now' : ''}">${done ? 'HECHO' : now ? 'AHORA' : 'FALTA'}</span></div>`;
@@ -213,22 +220,26 @@ function vInicio() {
     });
     cuerpo = secs.join('');
   }
-  const nota = esHoy && sd.dia && S.vista === 'entreno' ? `<label class="lbl" for="nota">NOTA DEL DÍA</label><textarea id="nota" class="nota-in" rows="2" placeholder="Cómo te sentiste, qué cambiaste…">${esc(ses ? ses.nota : '')}</textarea>` : '';
+  const nota = esHoy && dSel && S.vista === 'entreno' ? `<label class="lbl" for="nota">NOTA DEL DÍA</label><textarea id="nota" class="nota-in" rows="2" placeholder="Cómo te sentiste, qué cambiaste…">${esc(ses ? ses.nota : '')}</textarea>` : '';
   let cta = '';
-  const allDone = sd.dia && ses && hechosN === total;
-  if (!esHoy) cta = `<button class="cta" data-a="dia" data-x="${hoyWd}">VOLVER A HOY</button>`;
-  else if (!sd.dia || S.vista === 'descanso') cta = '';
+  const allDone = dSel && ses && hechosN === total;
+  const hoyEmpezado = (() => { const f = L.iso(hoy()); return S.sesiones.some(s => s.fecha === f && s.datos && Object.values(s.datos.ex || {}).some(x => (x.reps || []).length || x.skip)); })();
+  if (!esHoy) cta = dSel && pl.dias.find(x => x.wd === S.sel).estado !== 'hecho' && !hoyEmpezado
+    ? `<button class="cta" data-a="hacerHoy" data-x="${dSel}">HACER ESTA RUTINA HOY</button>`
+    : `<button class="cta" data-a="dia" data-x="${hoyWd}">VOLVER A HOY</button>`;
+  else if (!dSel) cta = `<button class="cta" data-a="hoja" data-x="elegir">ENTRENAR DE TODAS FORMAS</button>`;
+  else if (S.vista === 'descanso') cta = '';
   else if (allDone) cta = `<button class="cta" data-a="ir" data-x="resumen">VER RESUMEN DEL DÍA</button>`;
-  else cta = `<button class="cta" data-a="empezar">${hechosN || (ses && Object.keys(ses.datos.ex).length) ? 'SEGUIR' : 'EMPEZAR'}</button>`;
-  const segs = total ? Array.from({ length: total }, (_, j) => `<span class="pseg${ses && L.pasoHecho(L.RUTINA[sd.dia][j], ses.datos, k => setsDe(k, ses)) ? ' on' : ''}"></span>`).join('') : '';
+  else cta = `<button class="cta" data-a="empezar">${hechosN || (ses && Object.keys(ses.datos.ex).length) ? 'SEGUIR LA RUTINA' : 'INICIAR RUTINA'}</button>`;
+  const segs = total ? Array.from({ length: total }, (_, j) => `<span class="pseg${ses && L.pasoHecho(L.RUTINA[dSel][j], ses.datos, k => setsDe(k, ses)) ? ' on' : ''}"></span>`).join('') : '';
   return `<div class="pant">
   <header class="top">
     <div class="progreso-top">${segs}</div>
-    <div class="top-row"><div><div class="mini">CICLO ${i.ciclo} · SEMANA ${i.semana} DE 6${i.descarga ? ' · DESCARGA' : ''}</div><h1 class="h1">${esc(esHoy ? 'HOY' : sd.d.toUpperCase())} · ${esc(sd.dia ? L.DIAS[sd.dia].nombre.toUpperCase() : 'DESCANSO')}</h1></div><span id="sync" class="sync">${esc(syncTexto())}</span></div>
+    <div class="top-row"><div><div class="mini">CICLO ${i.ciclo} · SEMANA ${i.semana} DE 6${i.descarga ? ' · DESCARGA' : ''}</div><h1 class="h1">${esc(esHoy ? 'HOY' : sd.d.toUpperCase())} · ${esc(dSel ? L.DIAS[dSel].nombre.toUpperCase() : 'DESCANSO')}</h1></div><span id="sync" class="sync">${esc(syncTexto())}</span></div>
   </header>
   <div class="mini pad">DÍAS · 5</div>
   <div class="dias">${tarjetas}</div>
-  ${esHoy && sd.dia ? `<div class="pill2 pad"><button class="${S.vista === 'entreno' ? 'on' : ''}" data-a="vista" data-x="entreno">ENTRENO</button><button class="${S.vista === 'descanso' ? 'on' : ''}" data-a="vista" data-x="descanso">DESCANSO</button></div>` : ''}
+  ${esHoy && dSel ? `<div class="pill2 pad"><button class="${S.vista === 'entreno' ? 'on' : ''}" data-a="vista" data-x="entreno">ENTRENO</button><button class="${S.vista === 'descanso' ? 'on' : ''}" data-a="vista" data-x="descanso">DESCANSO</button></div>` : ''}
   ${falta ? `<div class="card pregunta"><div class="h3">FALTASTE EL ${esc(L.NOMBRE_DIA[L.DIAS[falta].wd].toUpperCase())} (${esc(L.DIAS[falta].nombre.toUpperCase())}). ¿QUÉ HACEMOS?</div>
     <button class="opt" data-a="falta" data-x="seguir" data-y="${falta}"><b>Seguir con la rutina</b><span>${esc(L.DIAS[falta].nombre)} se salta esta semana.</span></button>
     ${puede ? `<button class="opt" data-a="falta" data-x="mover" data-y="${falta}"><b>Reacomodar la semana</b><span>${esc(L.DIAS[falta].nombre)} pasa al ${L.NOMBRE_DIA[dest]}, tu día libre.</span></button>` : `<p class="nota">El ${L.NOMBRE_DIA[dest] || 'día libre'} ya está ocupado o pasó: no se puede mover.</p>`}</div>` : ''}
@@ -371,6 +382,13 @@ function vHoja() {
       ${e.carga !== 'tiempo' ? `<button class="opt" data-a="suave"><b>${esc(e.soft.n)}</b><span>${esc(e.soft.d)}</span></button><button class="opt" data-a="bajar10"><b>Bajar 10 % el peso hoy</b><span>Mismo ejercicio, más controlado</span></button>` : ''}
       <button class="opt" data-a="saltarEj"><b>Saltar este ejercicio hoy</b><span>No cuenta para tu progreso</span></button><p class="nota">Si el dolor es punzante o no se va, consulta a un fisioterapeuta.</p>`;
   }
+  if (h === 'elegir') {
+    t = 'ENTRENAR HOY'; const pl = plan(); const hechos = new Set(pl.dias.filter(x => x.estado === 'hecho' && x.dia).map(x => x.dia));
+    const pend = pl.faltas.length ? pl.faltas : L.PRIORIDAD.filter(d => !hechos.has(d));
+    body = `<p class="sub">Hoy es tu día de descanso. Si igual quieres entrenar, elige la rutina.${pend.length ? ' Te recomiendo la primera: es la que más te falta esta semana.' : ''}</p>` +
+      ['lun', 'mar', 'mie', 'vie', 'sab'].sort((a, b) => (pend.includes(a) ? pend.indexOf(a) : 9) - (pend.includes(b) ? pend.indexOf(b) : 9)).map(d =>
+        `<button class="opt" data-a="hacerHoy" data-x="${d}"><b>${esc(L.DIAS[d].nombre.toUpperCase())}</b><span>${hechos.has(d) ? 'Ya la hiciste esta semana' : L.RUTINA[d].reduce((a, p) => a + p.ex.length, 0) + ' ejercicios'}</span></button>`).join('');
+  }
   if (h === 'reiniciar') { t = 'CICLO NUEVO'; body = `<p class="txt">El ciclo vuelve a la semana 1 desde este lunes. Tus pesos e historial se mantienen.</p><button class="cta" data-a="reiniciar">SÍ, EMPEZAR CICLO NUEVO</button>`; }
   return `<div class="velo" data-a="cerrar"></div><div class="hoja" role="dialog" aria-label="${esc(t)}"><span class="asa"></span><div class="h2">${esc(t)}</div>${body}<button class="btn2 full" data-a="cerrar">CERRAR</button></div>`;
 }
@@ -413,6 +431,7 @@ const ACC = {
   vista(x) { S.vista = x; render(); },
   toggle(x) { S.abiertas[x] = x === 'cal' ? !S.abiertas[x] : S.abiertas[x] === false; render(); },
   falta(x, y) { const wk = L.iso(L.lunesDe(hoy())); S.perfil.decisiones = S.perfil.decisiones || {}; Object.keys(S.perfil.decisiones).forEach(k => { if (k < wk) delete S.perfil.decisiones[k]; }); S.perfil.decisiones[wk] = Object.assign({}, S.perfil.decisiones[wk], { [y]: x }); guardarPerfil(); render(); },
+  hacerHoy(x) { S.hoja = null; S.sel = L.weekday(hoy()); S.vista = 'entreno'; const ses = sesionHoy(true, x); ses.datos.elegida = true; ACC.empezar(); },
   empezar() {
     const ses = sesionHoy(true); const dia = ses.dia;
     const p = ses.datos.orden.findIndex(j => !L.pasoHecho(L.RUTINA[dia][j], ses.datos, k => setsDe(k, ses)));

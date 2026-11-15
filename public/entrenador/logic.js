@@ -185,6 +185,7 @@ export const PRIORIDAD = ['lun', 'sab', 'mie', 'mar', 'vie']; // glúteo primero
 export function iso(d) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}`; }
 export function parseIso(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
 export function weekday(d) { const w = d.getDay(); return w === 0 ? 7 : w; } // 1=lunes … 7=domingo
+export function inicioCiclo(d) { return weekday(d) >= 6 ? addDays(lunesDe(d), 7) : lunesDe(d); }
 export function lunesDe(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (weekday(x) - 1)); return x; }
 export function addDays(d, n) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; }
 export function diffDays(a, b) { return Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / 86400000); }
@@ -271,7 +272,8 @@ export function aviso(k, estadoEj, historial, info) {
 
 // ---------- semana: faltas y reacomodo ----------
 // sesiones: [{fecha, dia, terminada}] · decisiones: {semanaKey: {dia: 'seguir'|'mover'}}
-export function planSemana(hoy, sesiones, decisiones) {
+// desde: fecha (YYYY-MM-DD) en que empezaste a usar la app; los días anteriores no cuentan como faltas
+export function planSemana(hoy, sesiones, decisiones, desde) {
   const lunes = lunesDe(hoy); const wk = iso(lunes); const dec = (decisiones && decisiones[wk]) || {};
   const hechos = new Set(sesiones.filter(s => s.terminada && s.fecha >= wk && s.fecha <= iso(addDays(lunes, 6))).map(s => s.dia));
   const hoyWd = weekday(hoy);
@@ -280,6 +282,7 @@ export function planSemana(hoy, sesiones, decisiones) {
   const faltas = [];
   SEMANA.forEach(s => {
     if (!s.key || s.wd >= hoyWd) return;
+    if (desde && iso(addDays(lunes, s.wd - 1)) < desde) return;
     if (hechos.has(s.key) || dec[s.key]) return;
     faltas.push(s.key);
   });
@@ -292,6 +295,7 @@ export function planSemana(hoy, sesiones, decisiones) {
     if (dia && hechos.has(dia) && (movido || !(dec[dia] === 'mover'))) estado = 'hecho';
     else if (s.key && dec[s.key] === 'seguir') estado = 'saltado';
     else if (s.key && dec[s.key] === 'mover') estado = 'movido';
+    else if (s.key && s.wd < hoyWd && desde && fecha < desde) estado = 'antes';
     else if (s.key && s.wd < hoyWd) estado = 'faltaste';
     else if (!dia) estado = 'descanso';
     if (s.wd === hoyWd && estado === 'falta') estado = 'hoy';
