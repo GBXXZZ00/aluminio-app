@@ -1,3 +1,11 @@
+@font-face { font-family: 'Raleway'; font-style: normal; font-weight: 400; font-display: swap; src: url('fonts/raleway-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Raleway'; font-style: normal; font-weight: 500; font-display: swap; src: url('fonts/raleway-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Raleway'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/raleway-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Raleway'; font-style: normal; font-weight: 700; font-display: swap; src: url('fonts/raleway-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Raleway'; font-style: normal; font-weight: 800; font-display: swap; src: url('fonts/raleway-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Raleway'; font-style: normal; font-weight: 900; font-display: swap; src: url('fonts/raleway-latin-900-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Lora'; font-style: italic; font-weight: 500; font-display: swap; src: url('fonts/lora-latin-500-italic.woff2') format('woff2'); }
+@font-face { font-family: 'Lora'; font-style: italic; font-weight: 600; font-display: swap; src: url('fonts/lora-latin-600-italic.woff2') format('woff2'); }
 :root {
   --bg: #000; --card: #141416; --card2: #1d1d20; --line: rgba(255,255,255,.08);
   --tx: #f5f5f5; --tx2: #a6a6ad; --tx3: #77777f;
@@ -218,3 +226,66 @@ button:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 .btn-item { width: 100%; border: 0; border-top: 1px solid var(--line); background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .pad-b { margin: 0 20px 10px; width: calc(100% - 40px); }
 .it-n .badge { margin-left: 6px; vertical-align: middle; }
+
+/* ================= TEMA NEÓN MORADO (boceto) ================= */
+:root {
+  --bg: #0a0614; --card: rgba(255,255,255,.035); --card2: rgba(167,123,255,.10); --line: rgba(167,123,255,.16);
+  --tx: #f3efff; --tx2: #b3a8cc; --tx3: #7d7396;
+  --ac: #7a62c9; --ac2: #a594dc; --ac-tx: #ffffff; --ac-soft: rgba(139,92,246,.16);
+  --rosa: #d27ab8; --cian: #6cc3d3; --ok: #6cc9a3; --warn: #e3a3cf;
+  --glow: 0 0 0 1px rgba(165,148,220,.45), 0 0 12px rgba(122,98,201,.22);
+  --display: 'Raleway', system-ui, sans-serif;
+  --serif: 'Lora', Georgia, serif;
+}
+html, body { font-family: 'Raleway', system-ui, sans-serif; font-weight: 500; background: var(--bg); }
+body { background:
+  radial-gradient(120% 50% at 50% -10%, rgba(122,98,201,.18), transparent 60%),
+  radial-gradient(80% 40% at 100% 100%, rgba(210,122,184,.05), transparent 60%),
+  var(--bg); background-attachment: fixed; }
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .3;
+  background-image: radial-gradient(1px 1px at 12% 18%, #fff8, transparent), radial-gradient(1px 1px at 78% 9%, #fff6, transparent), radial-gradient(1px 1px at 42% 62%, #fff4, transparent), radial-gradient(1px 1px at 88% 48%, #fff5, transparent), radial-gradient(1px 1px at 25% 85%, #fff4, transparent), radial-gradient(1px 1px at 62% 30%, #fff3, transparent); }
+
+/* títulos: gruesos en mayúscula con degradado (como el video) */
+.h1 { font: 900 30px/1.02 var(--display); letter-spacing: .005em; background: linear-gradient(180deg, #ffffff 35%, #cfc4ec); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.h2 { font-weight: 800; }
+.h3, .sec-t, .dc-n { font-weight: 800; }
+.mini, .dc-d, .dc-m, .lbl { font-weight: 700; letter-spacing: .18em; }
+/* frase de arriba: letra elegante en cursiva (como "cinco minutos") */
+.top > .mini, .top .top-row .mini { font: italic 500 19px/1.2 var(--serif); letter-spacing: 0; color: var(--ac2); text-transform: lowercase; }
+.top > .mini::first-letter, .top .top-row .mini::first-letter { text-transform: uppercase; }
+.big { font-weight: 800; }
+
+/* tarjetas de vidrio con borde lila */
+.card, .sec, .dcard, .ant, .opt, .pill2, .chip, .btn2 { background: var(--card); border-color: var(--line); }
+.card, .sec { backdrop-filter: none; box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+.dcard.hoy { background: linear-gradient(160deg, #8a73d4, #5f4aa8); border-color: transparent; color: #fff; box-shadow: var(--glow); }
+.dcard.hoy .dc-d, .dcard.hoy .dc-m { color: #ece2ff; }
+.dcard.sel:not(.hoy) { border-color: var(--ac2); box-shadow: 0 0 8px rgba(122,98,201,.18); }
+
+/* botón principal con brillo neón */
+.cta { background: linear-gradient(90deg, #6f58c0, #8f7bd6); color: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset, 0 6px 18px rgba(122,98,201,.25); font-weight: 800; letter-spacing: .12em; }
+.pill2 button.on, .chip.on { background: linear-gradient(90deg, #6f58c0, #8a73d4); color: #fff; box-shadow: 0 0 8px rgba(122,98,201,.2); }
+.pseg { background: rgba(167,123,255,.15); } .pseg.on { background: var(--ac); } .pseg.cur { background: #eee9fb; }
+
+/* ejercicio activo: marco neón */
+.ejc.act { border-color: var(--ac2); box-shadow: var(--glow); }
+.bub.next { border-color: var(--ac2); box-shadow: 0 0 6px rgba(165,148,220,.3); color: #fff; }
+.bub.done { background: linear-gradient(160deg, #8a73d4, #5f4aa8); border-color: transparent; color: #fff; }
+.num { background: var(--card); border-color: var(--line); } .num.rango { border-color: var(--ac2); color: #fff; }
+/* descanso en celeste neón */
+.ring-fg { stroke: var(--cian); filter: drop-shadow(0 0 3px rgba(108,195,211,.5)); }
+.card.descanso { border-color: rgba(108,195,211,.25); }
+/* récords en rosa neón */
+.badge.ok { background: rgba(210,122,184,.12); color: var(--rosa); }
+.badge { background: var(--ac-soft); color: var(--ac2); }
+.st.ok { color: var(--cian); }
+.bar.b-principal { background: var(--ac);  } .bar.b-ss { background: var(--rosa);  } .bar.b-final, .bar.b-cal { background: var(--cian);  }
+/* diario */
+.cd.hecho { background: linear-gradient(160deg, #8a73d4, #5f4aa8); color: #fff; }
+.cd.parcial { box-shadow: inset 0 0 0 2px var(--rosa); }
+.pt.hecho { background: var(--ac); } .pt.parcial { box-shadow: inset 0 0 0 2px var(--rosa); }
+.ok-t { color: var(--cian); }
+/* barra de abajo */
+.nav { background: rgba(12,7,24,.88); border-top-color: var(--line); }
+.navb.on { color: var(--ac2); } .navb.on svg { }
+.disco.d0, .d0 { background: var(--ac); }

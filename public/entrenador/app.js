@@ -1,5 +1,5 @@
-import * as L from './logic.js?v=3';
-import * as API from './api.js?v=3';
+import * as L from './logic.js?v=4';
+import * as API from './api.js?v=4';
 
 const store = globalThis.localStorage;
 const $app = () => document.getElementById('app');
