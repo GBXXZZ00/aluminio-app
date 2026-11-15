@@ -34,6 +34,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  // La carpeta /entrenador/ es otra app con su propio trabajador de fondo: no se toca aquí.
+  if (url.pathname.includes('/entrenador/')) return;
 
   // Archivos del programa (assets/…): su nombre cambia en cada versión, así que
   // el guardado nunca queda viejo → primero el teléfono, internet solo si falta.
