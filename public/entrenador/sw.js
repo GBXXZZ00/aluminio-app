@@ -1,7 +1,7 @@
 // Guarda la app en el teléfono para que abra rápido y funcione sin señal en el gimnasio.
 // Los datos se sincronizan con Supabase cuando vuelve la conexión.
-const VERSION = 'entrenador-v4';
-const ARCHIVOS = ['./', './index.html', './styles.css?v=4', './app.js?v=4', './logic.js?v=4', './api.js?v=4', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './fonts/raleway-latin-400-normal.woff2', './fonts/raleway-latin-500-normal.woff2', './fonts/raleway-latin-600-normal.woff2', './fonts/raleway-latin-700-normal.woff2', './fonts/raleway-latin-800-normal.woff2', './fonts/raleway-latin-900-normal.woff2', './fonts/lora-latin-500-italic.woff2', './fonts/lora-latin-600-italic.woff2'];
+const VERSION = 'entrenador-v5';
+const ARCHIVOS = ['./', './index.html', './styles.css?v=5', './app.js?v=5', './logic.js?v=5', './api.js?v=5', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './fonts/poppins-latin-400-normal.woff2', './fonts/poppins-latin-500-normal.woff2', './fonts/poppins-latin-600-normal.woff2', './fonts/poppins-latin-700-normal.woff2', './fonts/poppins-latin-800-normal.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));

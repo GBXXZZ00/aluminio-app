@@ -1,5 +1,5 @@
-import * as L from './logic.js?v=4';
-import * as API from './api.js?v=4';
+import * as L from './logic.js?v=5';
+import * as API from './api.js?v=5';
 
 const store = globalThis.localStorage;
 const $app = () => document.getElementById('app');
@@ -11,7 +11,7 @@ const fechaLarga = d => d.toLocaleDateString('es', { weekday: 'short', day: 'num
 const S = {
   clave: null, perfil: { ex: {}, decisiones: {} }, sesiones: [], medidas: [],
   pantalla: 'cargando', loginModo: null, loginError: '',
-  sel: null, vista: 'entreno', abiertas: { cal: false },
+  sel: null, progTab: 'diario', instalable: false, instalOculto: false,
   run: null, hoja: null, hojaData: null, progEj: null, aviso: '', online: true, mes: null, diaSel: null
 };
 export const _S = S; // para pruebas
@@ -24,7 +24,8 @@ function leerCache() { try { const c = JSON.parse(store.getItem('gym_cache') || 
 function hoy() { const d = ahora(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function info() { return L.infoSemana(hoy(), S.perfil.inicio); }
 function plan() { return L.planSemana(hoy(), S.sesiones, S.perfil.decisiones, S.perfil.creado || null); }
-function diaDeHoy() { const f = L.iso(hoy()); const elegida = S.sesiones.find(s => s.fecha === f && s.datos && s.datos.elegida); if (elegida) return elegida.dia; const p = plan(); return p.dias.find(x => x.esHoy).dia; }
+// El día manda: lo que toca sale del calendario. Solo si hoy empezaste otra rutina a propósito (con algo anotado) se respeta esa.
+function diaDeHoy() { const f = L.iso(hoy()); const elegida = S.sesiones.find(s => s.fecha === f && s.datos && s.datos.elegida && (s.datos.t0 && Object.values(s.datos.ex || {}).some(x => (x.reps || []).length || x.skip))); if (elegida) return elegida.dia; const p = plan(); return p.dias.find(x => x.esHoy).dia; }
 function sesionDe(fecha, dia) { return S.sesiones.find(s => s.fecha === fecha && s.dia === dia); }
 function sesionHoy(crear, forzarDia) {
   const dia = forzarDia || diaDeHoy(); if (!dia) return null;
@@ -71,8 +72,15 @@ function syncTexto() { const n = API.pendientes(store); return n ? (S.online ? '
 API.onClaveInvalida(err => { S.clave = null; try { store.removeItem('gym_clave'); } catch (e) {} S.pantalla = 'login'; S.loginModo = 'entrar'; S.loginError = err === 'bloqueado' ? 'Demasiados intentos. Espera 15 minutos.' : 'Tu clave cambió o no es válida. Vuelve a entrar.'; render(); });
 
 // ---------------- arranque ----------------
+// Botón "Instalar": Chrome avisa cuando la app se puede poner en la pantalla de inicio
+let instalarEv = null;
+if (globalThis.addEventListener) {
+  globalThis.addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); instalarEv = ev; S.instalable = true; if (['inicio', 'perfil'].includes(S.pantalla)) render(); });
+  globalThis.addEventListener('appinstalled', () => { instalarEv = null; S.instalable = false; });
+}
 export async function iniciar() {
   leerCache();
+  try { S.instalOculto = store.getItem('gym_inst_oculto') === '1'; } catch (e) {}
   S.clave = store.getItem('gym_clave');
   if (S.clave) { S.pantalla = 'inicio'; render(); refrescar(); }
   else { S.pantalla = 'cargando'; render(); await revisarLogin(); }
@@ -108,7 +116,7 @@ async function refrescar() {
       guardarPerfil();
     }
     S.online = true; cache();
-    if (['inicio', 'progreso', 'cuerpo', 'diario'].includes(S.pantalla)) render();
+    if (['inicio', 'rutina', 'progreso', 'perfil'].includes(S.pantalla)) render();
   } catch (e) { S.online = false; render(); }
 }
 
@@ -134,124 +142,170 @@ async function despierto(on) { try { if (on && !wake && navigator.wakeLock) wake
 
 // ---------------- render ----------------
 export function render() {
-  const p = S.pantalla; let html = '';
-  if (p === 'cargando') html = `<div class="centro"><div class="marca">ENTRENADOR</div><p class="sub">Cargando…</p></div>`;
+  let p = S.pantalla; let html = '';
+  if (p === 'diario' || p === 'cuerpo' || p === 'ajustes') p = S.pantalla = (p === 'diario' ? 'progreso' : 'perfil');
+  if (p === 'cargando') html = `<div class="centro"><div class="marca">Entrenador</div><p class="sub">Cargando…</p></div>`;
   else if (p === 'login') html = vLogin();
   else if (p === 'inicio') html = vInicio() + nav('inicio');
+  else if (p === 'rutina') html = vRutina() + nav('rutina');
   else if (p === 'ejercicio') html = vEjercicio();
   else if (p === 'listo') html = vListo();
   else if (p === 'resumen') html = vResumen();
   else if (p === 'progreso') html = vProgreso() + nav('progreso');
-  else if (p === 'diario') html = (S.diaSel ? vDiaDetalle() : vDiario()) + nav('diario');
-  else if (p === 'cuerpo') html = vCuerpo() + nav('cuerpo');
-  else if (p === 'ajustes') html = vAjustes() + nav('ajustes');
+  else if (p === 'perfil') html = vPerfil() + nav('perfil');
   if (S.hoja) html += vHoja();
+  else if (['inicio', 'rutina', 'progreso', 'perfil'].includes(p) && S.clave) html += vFalta();
   $app().innerHTML = html;
-  const dcSel = document.querySelector('.dcard.sel'); if (dcSel && dcSel.parentElement) { try { dcSel.parentElement.scrollLeft = Math.max(0, dcSel.offsetLeft - 20); } catch (e) {} }
   despierto(p === 'ejercicio');
 }
 
+const ICO = {
+  inicio: 'M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  rutina: 'M3 12h3l3-7 4 14 3-7h5',
+  progreso: 'M5 20V12M10 20V6M15 20v-9M20 20V4',
+  perfil: 'M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4 21c1.2-4 4.3-6 8-6s6.8 2 8 6',
+  fuego: 'M12 2.5c.8 3.2 4.5 5 4.5 9.5a4.5 4.5 0 0 1-9 0c0-1.8.8-3.1 1.8-4.1.2 1.6 1 2.6 2.1 2.8-.6-2.6-.3-5.4.6-8.2z',
+  play: 'M8 5.5v13l11-6.5z'
+};
 function nav(act) {
-  const it = [['inicio', 'Hoy', 'M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z'], ['diario', 'Diario', 'M5 4h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM4 9h16M9 3v3M15 3v3'], ['progreso', 'Progreso', 'M4 19l5-6 4 3 7-9'], ['cuerpo', 'Mi cuerpo', 'M12 4a3 3 0 1 1 0 6a3 3 0 1 1 0-6zM5 21c1-4 4-6 7-6s6 2 7 6'], ['ajustes', 'Ajustes', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z']];
-  return `<nav class="nav">${it.map(([k, t, d]) => `<button class="navb${k === act ? ' on' : ''}" data-a="ir" data-x="${k}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>${t}</button>`).join('')}</nav>`;
+  const it = [['inicio', 'Hoy'], ['rutina', 'Rutina'], ['progreso', 'Progreso'], ['perfil', 'Perfil']];
+  return `<nav class="nav">${it.map(([k, t]) => `<button class="navb${k === act ? ' on' : ''}" data-a="ir" data-x="${k}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICO[k]}"/></svg>${t}</button>`).join('')}</nav>`;
 }
 
 function vLogin() {
   const crear = S.loginModo === 'crear';
   return `<div class="login">
-  <div class="marca">ENTRENADOR</div>
+  <div class="marca">Entrenador</div>
   <p class="sub">${crear ? 'Crea tu clave personal. Con ella entras desde cualquier teléfono y nadie más ve tus datos.' : 'Escribe tu clave personal.'}</p>
   <label class="lbl" for="c1">CLAVE</label>
   <input id="c1" class="inp" type="password" autocomplete="${crear ? 'new-password' : 'current-password'}" minlength="6" placeholder="Mínimo 6 caracteres">
   ${crear ? `<label class="lbl" for="c2">REPITE LA CLAVE</label><input id="c2" class="inp" type="password" autocomplete="new-password">` : ''}
   ${S.loginError ? `<p class="err" role="alert">${esc(S.loginError)}</p>` : ''}
-  <button class="cta" data-a="${crear ? 'crearClave' : 'entrar'}">${crear ? 'CREAR Y ENTRAR' : 'ENTRAR'}</button>
+  <button class="cta" data-a="${crear ? 'crearClave' : 'entrar'}">${crear ? 'Crear y entrar' : 'Entrar'}</button>
   ${crear ? '<p class="nota">Guárdala bien: si la olvidas no se puede recuperar desde la app.</p>' : ''}
 </div>`;
 }
 
-const SEC_T = { cal: 'CALENTAMIENTO', principal: 'BLOQUE PRINCIPAL', ss: 'SUPERSERIES', final: 'FINAL' };
-function bloques(dia) {
-  const out = []; L.RUTINA[dia].forEach((p, j) => { const last = out[out.length - 1]; if (last && last.sec === p.sec) last.pasos.push(j); else out.push({ sec: p.sec, pasos: [j] }); });
-  return out;
+// ---- ayudas para las pantallas ----
+function nEj(dia) { return L.RUTINA[dia].reduce((a, p) => a + p.ex.length, 0); }
+// Minutos aproximados: cada serie ≈ 45 s de trabajo + su descanso, más 8 min de calentamiento
+function minutos(dia, descarga) {
+  let s = 480;
+  L.RUTINA[dia].forEach(p => p.ex.forEach(k => { const e = L.EJ[k]; const desc = p.ex.length > 1 ? (e.ssRest || e.rest) : e.rest; s += L.seriesDe(e, descarga) * (45 + desc); }));
+  return Math.round(s / 300) * 5;
 }
+function hechosDe(dia, ses) { return ses ? L.RUTINA[dia].filter(p => L.pasoHecho(p, ses.datos, k => setsDe(k, ses))).length : 0; }
+function hoyEmpezado() { const f = L.iso(hoy()); return S.sesiones.some(s => s.fecha === f && s.datos && Object.values(s.datos.ex || {}).some(x => (x.reps || []).length || x.skip)); }
+const LETRA = ['', 'L', 'M', 'X', 'J', 'V', 'S', 'D'];
+function anillo(r, fr, cls) { const c = 2 * Math.PI * r; return `<circle cx="60" cy="60" r="${r}" class="an-bg"/><circle cx="60" cy="60" r="${r}" class="an ${cls}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - Math.max(0, Math.min(1, fr)))).toFixed(1)}" transform="rotate(-90 60 60)"/>`; }
+
+// ---------------- HOY ----------------
 function vInicio() {
+  const pl = plan(); const i = info(); const hoyWd = L.weekday(hoy()); const dHoy = diaDeHoy();
+  const ses = dHoy ? sesionDe(L.iso(hoy()), dHoy) : null;
+  const total = dHoy ? L.RUTINA[dHoy].length : 0; const hechosN = dHoy ? hechosDe(dHoy, ses) : 0;
+  const semHechos = pl.dias.filter(x => x.estado === 'hecho').length;
+  const ejTotal = dHoy ? nEj(dHoy) : 0; const ejHechos = dHoy && ses ? L.RUTINA[dHoy].reduce((a, p) => a + p.ex.filter(k => L.hecho(k, ses.datos, setsDe(k, ses))).length, 0) : 0;
+  const racha = L.rachaSemanas(hoy(), S.sesiones);
+  const fecha = hoy().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  const nombre = S.perfil.nombre || 'Raymundo';
+
+  // Tarjeta grande: el entrenamiento de hoy
+  let hero;
+  if (!dHoy) {
+    hero = `<div class="hero descansa"><div class="hero-l">HOY</div><div class="hero-t">Descanso</div><div class="hero-s">${hoyWd === 4 ? 'Si quieres, camina suave 20–30 min.' : 'Duerme bien y come suficiente proteína.'}</div>
+      <button class="btn2 hero-b2" data-a="hoja" data-x="elegir">Entrenar de todas formas</button></div>`;
+  } else if (ses && hechosN === total) {
+    hero = `<button class="hero hecho" data-a="ir" data-x="resumen"><div class="hero-l">HOY · TERMINADO</div><div class="hero-t">${esc(L.DIAS[dHoy].nombre)}</div><div class="hero-s">Toca para ver tu resumen</div><span class="play ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span></button>`;
+  } else {
+    const empezado = hechosN || (ses && Object.keys(ses.datos.ex).length);
+    const barra = empezado ? `<div class="hero-bar">${Array.from({ length: total }, (_, j) => `<span class="${ses && L.pasoHecho(L.RUTINA[dHoy][j], ses.datos, k => setsDe(k, ses)) ? 'on' : ''}"></span>`).join('')}</div>` : '';
+    hero = `<button class="hero" data-a="empezar" aria-label="${empezado ? 'Seguir' : 'Empezar'} ${esc(L.DIAS[dHoy].nombre)}"><div class="hero-l">${empezado ? 'EN CURSO · ' + hechosN + ' DE ' + total : 'ENTRENAMIENTO DE HOY'}</div><div class="hero-t">${esc(L.DIAS[dHoy].nombre)}</div><div class="hero-s">${minutos(dHoy, i.descarga)} min · ${nEj(dHoy)} ejercicios${i.descarga ? ' · descarga' : ''}</div>${barra}<span class="play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICO.play}"/></svg></span></button>`;
+  }
+
+  // Un solo consejo, el más importante
+  let tip = null;
+  if (i.descarga) tip = ['Semana de descarga', 'Mitad de series y 10 % menos de peso. Ya está calculado.'];
+  else if (i.buscarPesos) tip = ['Semanas 1 y 2', 'Encuentra tus pesos: termina cada serie con 2 o 3 repeticiones de sobra.'];
+  else if (i.avisoDescarga) tip = ['La próxima semana es de descarga', 'Esta semana intenta superar tus pesos.'];
+
+  // Barras de la semana
+  const alto = { hecho: 100, hoy: 100, falta: 62, faltaste: 34, saltado: 34, movido: 34, antes: 34, descanso: 18 };
+  const barras = pl.dias.map(x => `<button class="sb st-${x.estado}${x.esHoy ? ' hoy' : ''}" data-a="verRutina" data-x="${x.wd}" aria-label="${esc(L.NOMBRE_DIA[x.wd] + ': ' + (x.dia ? L.DIAS[x.dia].nombre : 'descanso') + ', ' + x.estado)}"><span class="sb-c"><i style="height:${alto[x.estado] || 34}%"></i></span><span class="sb-d">${LETRA[x.wd]}</span></button>`).join('');
+
+  // Siguiente entrenamiento
+  const sig = pl.dias.find(x => x.wd > hoyWd && x.dia && x.estado !== 'hecho');
+  const sigDia = sig ? sig.dia : 'lun';
+  const sigTxt = sig ? (sig.wd === hoyWd + 1 ? 'MAÑANA' : L.NOMBRE_DIA[sig.wd].toUpperCase()) : 'EL LUNES';
+
+  const inst = S.instalable && !S.instalOculto ? `<div class="card inst"><div><div class="h3">Pon el Entrenador en tu pantalla</div><p class="sub">Se abre como app, aparte de Aluminio.</p></div><button class="chip on" data-a="instalar">Instalar</button><button class="x" data-a="ocultarInst" aria-label="Cerrar">×</button></div>` : '';
+
+  return `<div class="pant">
+  <header class="saludo"><div><div class="fecha">${esc(fecha.charAt(0).toUpperCase() + fecha.slice(1))}</div><h1 class="h1">Hola, ${esc(nombre)}</h1></div>
+    <span class="racha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICO.fuego}"/></svg>${racha} ${racha === 1 ? 'sem' : 'sem'}</span></header>
+  <span id="sync" class="sync pad">${esc(syncTexto())}</span>
+  ${inst}
+  <div class="card anillos"><svg viewBox="0 0 120 120" aria-hidden="true">${anillo(52, semHechos / 5, 'a1')}${anillo(38, ejTotal ? ejHechos / ejTotal : 0, 'a2')}${anillo(24, i.semana / 6, 'a3')}</svg>
+    <div class="leyenda"><div><span class="pt a1"></span>Semana<b>${semHechos}<small> / 5</small></b></div><div><span class="pt a2"></span>Hoy<b>${dHoy ? ejHechos + '<small> / ' + ejTotal + '</small>' : '—'}</b></div><div><span class="pt a3"></span>Ciclo ${i.ciclo}<b>${i.semana}<small> / 6</small></b></div></div></div>
+  ${hero}
+  ${tip ? `<div class="tip"><b>${esc(tip[0])}.</b> ${esc(tip[1])}</div>` : ''}
+  <div class="card semana"><div class="row-b"><span class="mini">ESTA SEMANA</span><span class="mini">${semHechos} DE 5</span></div><div class="sbars">${barras}</div></div>
+  <button class="card sig" data-a="verRutina" data-x="${sig ? sig.wd : 1}"><div><div class="mini">SIGUIENTE · ${esc(sigTxt)}</div><div class="h2">${esc(L.DIAS[sigDia].nombre)}</div></div><span class="sig-m">${minutos(sigDia)} min</span></button>
+  <div class="espacio"></div>
+</div>`;
+}
+
+// ---------------- pregunta obligatoria si faltaste ----------------
+// Sale encima de todo y no deja usar la app hasta contestar.
+function vFalta() {
+  const pl = plan(); const falta = pl.faltas.length ? pl.faltas[0] : null; if (!falta) return '';
+  const puede = L.puedeMover(hoy(), falta, S.perfil.decisiones); const dest = L.destino(L.DIAS[falta].wd);
+  const nd = L.NOMBRE_DIA[L.DIAS[falta].wd]; const nombre = L.DIAS[falta].nombre;
+  return `<div class="velo fijo"></div><div class="hoja modal" role="alertdialog" aria-modal="true" aria-label="Faltaste un día">
+    <div class="falta-ic">!</div>
+    <div class="h2">Faltaste el ${esc(nd)}</div>
+    <p class="sub">No hiciste <b>${esc(nombre)}</b>. Antes de seguir, dime qué hacemos con la semana.</p>
+    ${puede ? `<button class="opt prin" data-a="falta" data-x="mover" data-y="${falta}"><b>Cambiar la rutina: hacerlo el ${esc(L.NOMBRE_DIA[dest])}</b><span>${esc(nombre)} pasa a tu día libre del ${esc(L.NOMBRE_DIA[dest])}.</span></button>` : ''}
+    <button class="opt" data-a="falta" data-x="seguir" data-y="${falta}"><b>No cambiar nada</b><span>${esc(nombre)} se salta esta semana y sigues normal.</span></button>
+    ${puede ? '' : `<p class="nota">No se puede pasar a otro día: el ${esc(L.NOMBRE_DIA[dest] || 'día libre')} ya pasó o está ocupado.</p>`}
+  </div>`;
+}
+
+// ---------------- RUTINA (ver cualquier día) ----------------
+function vRutina() {
   const pl = plan(); const i = info(); const hoyWd = L.weekday(hoy());
   if (S.sel == null) S.sel = hoyWd;
   const sd = pl.dias.find(x => x.wd === S.sel); const esHoy = S.sel === hoyWd;
   const dSel = esHoy ? diaDeHoy() : sd.dia;
   const ses = dSel ? sesionDe(sd.fecha, dSel) : null;
-  const total = dSel ? L.RUTINA[dSel].length : 0;
-  const hechosN = dSel && ses ? L.RUTINA[dSel].filter(p => L.pasoHecho(p, ses.datos, k => setsDe(k, ses))).length : 0;
-  const tarjetas = pl.dias.map(x => {
-    const meta = { antes: '—', hecho: 'HECHO', faltaste: 'FALTASTE', saltado: 'SALTADO', movido: 'MOVIDO', descanso: 'DESCANSO', hoy: (x.esHoy && diaDeHoy()) ? L.RUTINA[diaDeHoy()].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : x.dia ? L.RUTINA[x.dia].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : '', falta: x.dia ? L.RUTINA[x.dia].reduce((a, p) => a + p.ex.length, 0) + ' EJ' : '' }[x.estado];
-    const xd = x.esHoy ? (diaDeHoy() || x.dia) : x.dia; const nombre = xd ? L.DIAS[xd].nombre : 'Descanso';
-    return `<button class="dcard${x.wd === S.sel ? ' sel' : ''}${x.esHoy ? ' hoy' : ''} st-${x.estado}" data-a="dia" data-x="${x.wd}" aria-label="${esc(x.d + ', ' + nombre + ', ' + meta)}">
-      <span class="dc-d">${esc(x.d.toUpperCase())}${x.movido ? ' · MOVIDO' : ''}</span><span class="dc-n">${esc(nombre.toUpperCase())}</span><span class="dc-m">${esc(meta)}</span></button>`;
-  }).join('');
-  const avisos = [];
-  if (esHoy) {
-    if (i.descarga) avisos.push(['SEMANA DE DESCARGA', 'La mitad de las series, 10 % menos de peso y RIR 3–4. Ya está calculado en cada ejercicio.']);
-    else if (i.avisoDescarga) avisos.push(['LA PRÓXIMA SEMANA ES DE DESCARGA', 'Esta semana intenta superar tus pesos. Después tu cuerpo se recupera.']);
-    if (i.buscarPesos) avisos.push(['SEMANAS 1 Y 2: ENCUENTRA TUS PESOS', 'Usa RIR 2–3: termina cada serie con 2 o 3 repeticiones de sobra. Toca el peso de cada ejercicio para anotarlo.']);
-    if (hoyWd === 1 && !i.buscarPesos) avisos.push(['ES LUNES', 'La semana empieza con la rutina principal, aunque la pasada hayas faltado.']);
-    if (dSel && !i.descarga) L.RUTINA[dSel].forEach(p => p.ex.forEach(k => { const st = estadoEj(k); if (st && st.trial) avisos.push(['HOY PRUEBAS SUBIR', L.EJ[k].n + ': ' + st.trial.from + ' → ' + st.trial.to + ' ' + st.trial.u + '. A ver qué tal.']); }));
-  }
-  const falta = esHoy && pl.faltas.length ? pl.faltas[0] : null;
-  const puede = falta && L.puedeMover(hoy(), falta, S.perfil.decisiones);
-  const dest = falta ? L.destino(L.DIAS[falta].wd) : null;
-  let cuerpo = '';
-  if (!dSel || (esHoy && S.vista === 'descanso')) {
-    cuerpo = `<div class="card descanso"><div class="h2">DESCANSO</div><p class="sub">${!dSel ? (sd.wd === 4 ? 'Opcional: caminata suave de 20–30 min.' : 'Descanso total. Duerme bien y come suficiente proteína.') : 'Hoy descansas. Mañana te pregunto si reacomodamos la semana para no perder este entrenamiento.'}</p></div>`;
+  const chips = pl.dias.map(x => `<button class="dch${x.wd === S.sel ? ' on' : ''}${x.esHoy ? ' hoy' : ''} st-${x.estado}" data-a="dia" data-x="${x.wd}"><span>${LETRA[x.wd]}</span><i></i></button>`).join('');
+  const estadoTxt = { hecho: 'Hecho', faltaste: 'Faltaste', saltado: 'Saltado', movido: 'Movido', antes: '', descanso: '', hoy: 'Hoy', falta: '' }[sd.estado] || '';
+  let cuerpo = '', cta = '';
+  if (!dSel) {
+    cuerpo = `<div class="card"><div class="h2">Descanso</div><p class="sub">${S.sel === 4 ? 'Opcional: caminata suave de 20–30 min.' : 'Descanso total. Duerme bien y come suficiente proteína.'}</p></div>`;
+    if (esHoy) cta = `<button class="cta" data-a="hoja" data-x="elegir">Entrenar de todas formas</button>`;
   } else {
-    const secs = [];
-    const calOpen = !!S.abiertas.cal;
-    secs.push(`<section class="sec"><button class="sec-h" data-a="toggle" data-x="cal" aria-expanded="${calOpen}"><span class="bar b-cal"></span><span class="sec-t">CALENTAMIENTO · ${L.CALENTAMIENTO.length}</span><span class="chev${calOpen ? ' up' : ''}"></span></button>
-      ${calOpen ? `<div class="sec-b">${L.CALENTAMIENTO.map(c => `<div class="item"><div><div class="it-n">${esc(c.n)}</div><div class="it-d">${esc(c.d)}</div></div></div>`).join('')}</div>` : ''}</section>`);
-    const primerPend = ses ? (ses.datos.orden || []).find(j => !L.pasoHecho(L.RUTINA[dSel][j], ses.datos, k => setsDe(k, ses))) : 0;
-    bloques(dSel).forEach((b, bi) => {
-      const key = b.sec + bi; const open = S.abiertas[key] !== false;
-      const n = b.pasos.reduce((a, j) => a + L.RUTINA[dSel][j].ex.length, 0);
-      const items = b.pasos.map(j => {
-        const p = L.RUTINA[dSel][j]; const done = ses && L.pasoHecho(p, ses.datos, k => setsDe(k, ses)); const now = esHoy && !done && j === primerPend;
-        const lines = p.ex.map((k, xi) => { const e = L.EJ[k]; const st = estadoEj(k); const sets = L.seriesDe(e, esHoy && i.descarga); const w = st && st.w != null && e.carga !== 'tiempo' ? ' · ' + (esHoy && i.descarga ? L.pesoDescarga(e, st.w, st.u) : st.w) + ' ' + st.u : '';
-          return `<div class="it-n">${p.ex.length > 1 ? (xi === 0 ? 'A1 · ' : 'A2 · ') : ''}${esc(nombreEj(k, ses))}</div><div class="it-d">${sets} × ${e.lo}–${e.hi}${e.carga === 'tiempo' ? ' s' : ''}${e.porPierna ? ' por pierna' : ''}${w}</div>`; }).join('');
-        return `<div class="item"><div>${p.label ? `<div class="ss-tag">SUPERSERIE ${p.label}</div>` : ''}${lines}</div><span class="st ${done ? 'ok' : now ? 'now' : ''}">${done ? 'HECHO' : now ? 'AHORA' : 'FALTA'}</span></div>`;
-      }).join('');
-      secs.push(`<section class="sec"><button class="sec-h" data-a="toggle" data-x="${key}" aria-expanded="${open}"><span class="bar b-${b.sec}"></span><span class="sec-t">${SEC_T[b.sec]} · ${n}</span><span class="chev${open ? ' up' : ''}"></span></button>${open ? `<div class="sec-b">${items}</div>` : ''}</section>`);
-    });
-    cuerpo = secs.join('');
+    const primer = ses && esHoy ? (ses.datos.orden || []).find(j => !L.pasoHecho(L.RUTINA[dSel][j], ses.datos, k => setsDe(k, ses))) : (esHoy ? 0 : -1);
+    const desc = esHoy && i.descarga;
+    const lista = L.RUTINA[dSel].map((p, j) => {
+      const done = ses && L.pasoHecho(p, ses.datos, k => setsDe(k, ses)); const now = esHoy && !done && j === primer;
+      const lineas = p.ex.map(k => { const e = L.EJ[k]; const st = estadoEj(k); const w = st && st.w != null && e.carga !== 'tiempo' ? ' · ' + (desc ? L.pesoDescarga(e, st.w, st.u) : st.w) + ' ' + st.u : '';
+        return `<div class="paso-n">${esc(nombreEj(k, ses))}</div><div class="it-d">${L.seriesDe(e, desc)} × ${e.lo}–${e.hi}${e.carga === 'tiempo' ? ' s' : ''}${e.porPierna ? ' por pierna' : ''}${w}</div>`; }).join('');
+      return `<div class="paso${done ? ' ok' : now ? ' now' : ''}"><span class="num-c">${done ? '✓' : j + 1}</span><div class="paso-b">${p.label ? `<div class="ss-tag">SUPERSERIE ${p.label}</div>` : ''}${lineas}</div></div>`;
+    }).join('');
+    cuerpo = `<div class="card dia-c"><div class="row-b"><div><div class="mini">${esc(L.NOMBRE_DIA[S.sel].toUpperCase())}${estadoTxt ? ' · ' + esc(estadoTxt.toUpperCase()) : ''}</div><div class="h2 big2">${esc(L.DIAS[dSel].nombre)}</div></div><span class="sig-m">${minutos(dSel, desc)} min</span></div>
+      <div class="calent"><b>Calentamiento:</b> ${L.CALENTAMIENTO.map(c => esc(c.n.toLowerCase() + ' ' + c.d)).join(' · ')}</div>
+      <div class="pasos">${lista}</div></div>`;
+    const allDone = ses && hechosDe(dSel, ses) === L.RUTINA[dSel].length;
+    if (esHoy) cta = allDone ? `<button class="cta" data-a="ir" data-x="resumen">Ver resumen del día</button>` : `<button class="cta" data-a="empezar">${hechosDe(dSel, ses) || (ses && Object.keys(ses.datos.ex).length) ? 'Seguir la rutina' : 'Empezar rutina'}</button>`;
+    else if (sd.estado !== 'hecho' && !hoyEmpezado()) cta = `<button class="cta sec2" data-a="hacerHoy" data-x="${dSel}">Hacer esta rutina hoy</button>`;
   }
-  const nota = esHoy && dSel && S.vista === 'entreno' ? `<label class="lbl" for="nota">NOTA DEL DÍA</label><textarea id="nota" class="nota-in" rows="2" placeholder="Cómo te sentiste, qué cambiaste…">${esc(ses ? ses.nota : '')}</textarea>` : '';
-  let cta = '';
-  const allDone = dSel && ses && hechosN === total;
-  const hoyEmpezado = (() => { const f = L.iso(hoy()); return S.sesiones.some(s => s.fecha === f && s.datos && Object.values(s.datos.ex || {}).some(x => (x.reps || []).length || x.skip)); })();
-  if (!esHoy) cta = dSel && pl.dias.find(x => x.wd === S.sel).estado !== 'hecho' && !hoyEmpezado
-    ? `<button class="cta" data-a="hacerHoy" data-x="${dSel}">HACER ESTA RUTINA HOY</button>`
-    : `<button class="cta" data-a="dia" data-x="${hoyWd}">VOLVER A HOY</button>`;
-  else if (!dSel) cta = `<button class="cta" data-a="hoja" data-x="elegir">ENTRENAR DE TODAS FORMAS</button>`;
-  else if (S.vista === 'descanso') cta = '';
-  else if (allDone) cta = `<button class="cta" data-a="ir" data-x="resumen">VER RESUMEN DEL DÍA</button>`;
-  else cta = `<button class="cta" data-a="empezar">${hechosN || (ses && Object.keys(ses.datos.ex).length) ? 'SEGUIR LA RUTINA' : 'INICIAR RUTINA'}</button>`;
-  const segs = total ? Array.from({ length: total }, (_, j) => `<span class="pseg${ses && L.pasoHecho(L.RUTINA[dSel][j], ses.datos, k => setsDe(k, ses)) ? ' on' : ''}"></span>`).join('') : '';
-  return `<div class="pant">
-  <header class="top">
-    <div class="progreso-top">${segs}</div>
-    <div class="top-row"><div><div class="mini">CICLO ${i.ciclo} · SEMANA ${i.semana} DE 6${i.descarga ? ' · DESCARGA' : ''}</div><h1 class="h1">${esc(esHoy ? 'HOY' : sd.d.toUpperCase())} · ${esc(dSel ? L.DIAS[dSel].nombre.toUpperCase() : 'DESCANSO')}</h1></div><span id="sync" class="sync">${esc(syncTexto())}</span></div>
-  </header>
-  <div class="mini pad">DÍAS · 5</div>
-  <div class="dias">${tarjetas}</div>
-  ${esHoy && dSel ? `<div class="pill2 pad"><button class="${S.vista === 'entreno' ? 'on' : ''}" data-a="vista" data-x="entreno">ENTRENO</button><button class="${S.vista === 'descanso' ? 'on' : ''}" data-a="vista" data-x="descanso">DESCANSO</button></div>` : ''}
-  ${falta ? `<div class="card pregunta"><div class="h3">FALTASTE EL ${esc(L.NOMBRE_DIA[L.DIAS[falta].wd].toUpperCase())} (${esc(L.DIAS[falta].nombre.toUpperCase())}). ¿QUÉ HACEMOS?</div>
-    <button class="opt" data-a="falta" data-x="seguir" data-y="${falta}"><b>Seguir con la rutina</b><span>${esc(L.DIAS[falta].nombre)} se salta esta semana.</span></button>
-    ${puede ? `<button class="opt" data-a="falta" data-x="mover" data-y="${falta}"><b>Reacomodar la semana</b><span>${esc(L.DIAS[falta].nombre)} pasa al ${L.NOMBRE_DIA[dest]}, tu día libre.</span></button>` : `<p class="nota">El ${L.NOMBRE_DIA[dest] || 'día libre'} ya está ocupado o pasó: no se puede mover.</p>`}</div>` : ''}
-  ${avisos.map(a => `<div class="card aviso"><div class="h3">${esc(a[0])}</div><p class="sub">${esc(a[1])}</p></div>`).join('')}
-  ${nota}
+  return `<div class="pant"><header class="top"><div class="mini">CICLO ${i.ciclo} · SEMANA ${i.semana} DE 6${i.descarga ? ' · DESCARGA' : ''}</div><h1 class="h1">Rutina</h1></header>
+  <div class="dchips">${chips}</div>
   ${cuerpo}
   <div class="espacio"></div>
 </div>${cta ? `<div class="pie">${cta}</div>` : ''}`;
 }
-
 // ---------------- ejercicio ----------------
 function runPaso() { const r = S.run; const ses = sesionDe(r.fecha, r.dia); return { r, ses, paso: L.RUTINA[r.dia][ses.datos.orden[r.pos]], idx: ses.datos.orden[r.pos] }; }
 function vEjercicio() {
@@ -272,15 +326,15 @@ function vEjercicio() {
     <div class="rest-r"><span class="sub">Luego: <b>${esc(esSS ? nombreEj(k, ses) + ', ' : '')}serie ${nSet} de ${sets(k)}</b></span><div class="row2"><button class="btn2" data-a="mas30">+30 s</button><button class="btn2" data-a="saltarDesc">SALTAR</button></div></div></div>` : '';
   const espera = r.espera && r.espera > Date.now() ? `<div class="card espera"><span>Esperando la máquina · ${fmt((r.espera - Date.now()) / 1000)}</span><button class="btn2" data-a="libre">Ya está libre</button></div>` : '';
   return `<div class="pant ej">
-  <header class="top"><div class="progreso-top">${segs}</div><div class="top-row"><span class="mini">${r.pos + 1} DE ${orden.length} · ${after <= 0 ? 'EL ÚLTIMO' : 'FALTAN ' + after}${ses.datos.t0 ? ' · <span id="reloj">' + fmt((Date.now() - ses.datos.t0) / 1000) + '</span>' : ''}</span><button class="chip" data-a="ir" data-x="inicio">RUTINA</button></div></header>
-  ${esSS ? `<div class="row-b pad"><h1 class="h1">SUPERSERIE ${paso.label}</h1><div class="pill2 sm"><button class="${!sep ? 'on' : ''}" data-a="sep" data-x="0">JUNTOS</button><button class="${sep ? 'on' : ''}" data-a="sep" data-x="1">SEPARADO</button></div></div>` : ''}
+  <header class="top"><div class="progreso-top">${segs}</div><div class="top-row"><span class="mini">${r.pos + 1} DE ${orden.length} · ${after <= 0 ? 'EL ÚLTIMO' : 'FALTAN ' + after}${ses.datos.t0 ? ' · <span id="reloj">' + fmt((Date.now() - ses.datos.t0) / 1000) + '</span>' : ''}</span><button class="chip" data-a="ir" data-x="inicio">Salir</button></div></header>
+  ${esSS ? `<div class="row-b pad"><h1 class="h1">Superserie ${paso.label}</h1><div class="pill2 sm"><button class="${!sep ? 'on' : ''}" data-a="sep" data-x="0">JUNTOS</button><button class="${sep ? 'on' : ''}" data-a="sep" data-x="1">SEPARADO</button></div></div>` : ''}
   ${espera}
   ${cards}
-  <div class="card aviso"><div class="h3">${esc(av.t.toUpperCase())}</div><p class="sub">${esc(av.d)}</p></div>
+  <div class="card aviso"><div class="h3">${esc(av.t)}</div><p class="sub">${esc(av.d)}</p></div>
   ${restHtml}${picker}
   <div class="espacio"></div>
 </div>
-<div class="pie tri"><button class="btn2" data-a="hoja" data-x="como">CÓMO</button><button class="btn2" data-a="hoja" data-x="molesta">ME MOLESTA</button><button class="btn2" data-a="hoja" data-x="ocupada">OCUPADA</button></div>`;
+<div class="pie tri"><button class="btn2" data-a="hoja" data-x="como">Cómo</button><button class="btn2" data-a="hoja" data-x="molesta">Me molesta</button><button class="btn2" data-a="hoja" data-x="ocupada">Ocupada</button></div>`;
 }
 function nombreBase(k) { return k === 'abd_sab' && S.perfil.abdMaquina ? 'Abducción en máquina combinada' : L.EJ[k].n; }
 function nombreEj(k, ses) { const en = ses && ses.datos.ex[k]; return en && en.swap ? en.swap : nombreBase(k); }
@@ -298,7 +352,7 @@ function tarjetaEj(k, ses, act, esSS, idx, paso) {
   }
   return `<div class="card ejc${esSS ? (act ? ' act' : ' inact') : ''}">${tag}
     ${en.swap ? `<div class="sub">En lugar de ${esc(e.n)}</div>` : ''}
-    <div class="row-b"><div class="${esSS ? 'h2' : 'h1'}">${esc(nombreEj(k, ses).toUpperCase())}</div>${trial ? '<span class="badge">PRUEBA</span>' : ''}</div>
+    <div class="row-b"><div class="${esSS ? 'h2' : 'h1'}">${esc(nombreEj(k, ses))}</div>${trial ? '<span class="badge">PRUEBA</span>' : ''}</div>
     <div class="it-d">${n} × ${e.lo}–${e.hi}${e.carga === 'tiempo' ? ' s' : ''}${e.porPierna ? ' por pierna' : ''} · ${esSS ? 'pausa ' + fmt(ses.datos.sep[idx] ? e.rest : (e.ssRest || e.rest)) : 'descanso ' + fmt(e.rest)} · RIR ${ses.datos.descarga ? '3–4' : e.rir}</div>
     ${peso}${barra}${ultimaVez(k, ses)}<div class="bubs">${bub}</div></div>`;
 }
@@ -313,11 +367,11 @@ function discoClase(p, u) { const s = u === 'lb' ? [45, 35, 25, 10, 5, 2.5] : [2
 
 function vListo() {
   const { ses, paso } = runPaso();
-  const items = paso.ex.map(k => { const en = ses.datos.ex[k] || {}; const d = en.decision || {}; return `<div class="card"><div class="row-b"><div class="h3">${esc(nombreEj(k, ses).toUpperCase())}</div>${en.pr ? '<span class="badge ok">RÉCORD</span>' : ''}</div><div class="it-d">${en.skip ? 'Saltado hoy' : (en.reps || []).length + ' series · ' + (en.w == null ? '' : en.w + ' ' + en.u + ' · ') + (en.reps || []).join(' · ')}</div>${d.t ? `<p class="txt">${esc(d.t)}</p><p class="sub">${esc(d.d)}</p>` : ''}</div>`; }).join('');
+  const items = paso.ex.map(k => { const en = ses.datos.ex[k] || {}; const d = en.decision || {}; return `<div class="card"><div class="row-b"><div class="h3">${esc(nombreEj(k, ses))}</div>${en.pr ? '<span class="badge ok">RÉCORD</span>' : ''}</div><div class="it-d">${en.skip ? 'Saltado hoy' : (en.reps || []).length + ' series · ' + (en.w == null ? '' : en.w + ' ' + en.u + ' · ') + (en.reps || []).join(' · ')}</div>${d.t ? `<p class="txt">${esc(d.t)}</p><p class="sub">${esc(d.d)}</p>` : ''}</div>`; }).join('');
   const sig = siguientePos(); const nm = sig >= 0 ? nombrePaso(ses, sig) : '';
   return `<div class="pant listo"><div class="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
-  <h1 class="h1">${paso.ex.length > 1 ? 'SUPERSERIE ' + paso.label + ' HECHA' : esc(nombreEj(paso.ex[0], ses).toUpperCase()) + ' · HECHO'}</h1>${items}
-  ${sig >= 0 ? `<div class="card"><div class="mini">SIGUE</div><div class="h2">${esc(nm.toUpperCase())}</div></div>` : ''}<div class="espacio"></div></div>
+  <h1 class="h1">${paso.ex.length > 1 ? 'Superserie ' + paso.label + ' hecha' : esc(nombreEj(paso.ex[0], ses)) + ' · hecho'}</h1>${items}
+  ${sig >= 0 ? `<div class="card"><div class="mini">SIGUE</div><div class="h2">${esc(nm)}</div></div>` : ''}<div class="espacio"></div></div>
   <div class="pie"><button class="cta" data-a="siguiente">${sig >= 0 ? 'SIGUIENTE' : (diaCompleto(ses) ? 'VER RESUMEN' : 'VOLVER A LO PENDIENTE')}</button></div>`;
 }
 function nombrePaso(ses, pos) { const p = L.RUTINA[S.run.dia][ses.datos.orden[pos]]; return p.ex.length > 1 ? 'Superserie ' + p.label : nombreEj(p.ex[0], ses); }
@@ -344,7 +398,7 @@ function filasSesion(ses) {
 function vResumen() {
   const ses = sesionHoy(false) || (S.run && sesionDe(S.run.fecha, S.run.dia)); if (!ses) { S.pantalla = 'inicio'; return vInicio(); }
   const rs = L.resumenSesion(ses);
-  return `<div class="pant"><header class="top"><div class="mini ok-t">DÍA TERMINADO</div><h1 class="h1">${esc(L.DIAS[ses.dia].nombre.toUpperCase())}</h1></header>
+  return `<div class="pant"><header class="top"><div class="mini ok-t">DÍA TERMINADO</div><h1 class="h1">${esc(L.DIAS[ses.dia].nombre)}</h1></header>
   ${statsSesion(ses)}
   ${rs.records.length ? `<div class="card aviso"><div class="h3">¡NUEVO RÉCORD!</div><p class="sub">Hoy superaste tu mejor marca en ${esc(rs.records.map(k => nombreEj(k, ses)).join(', '))}.</p></div>` : ''}
   <section class="sec"><div class="sec-h"><span class="bar b-principal"></span><span class="sec-t">LO QUE HICISTE HOY</span></div><div class="sec-b">${filasSesion(ses)}</div></section>
@@ -352,8 +406,16 @@ function vResumen() {
   <div class="espacio"></div></div><div class="pie"><button class="cta" data-a="ir" data-x="inicio">VOLVER AL INICIO</button></div>`;
 }
 
-// ---------------- diario ----------------
+// ---------------- progreso (diario + pesos) ----------------
 function conRegistro(s) { return s.datos && Object.values(s.datos.ex || {}).some(e => (e.reps || []).length || e.skip); }
+function vProgreso() {
+  if (S.diaSel) return vDiaDetalle();
+  const tab = S.progTab || 'diario';
+  return `<div class="pant"><header class="top"><h1 class="h1">Progreso</h1></header>
+  <div class="pill2 pad"><button class="${tab === 'diario' ? 'on' : ''}" data-a="progTab" data-x="diario">Diario</button><button class="${tab === 'pesos' ? 'on' : ''}" data-a="progTab" data-x="pesos">Pesos</button></div>
+  ${tab === 'diario' ? vDiario() : vPesos()}
+  <div class="espacio"></div></div>`;
+}
 function vDiario() {
   const base = S.mes ? L.parseIso(S.mes) : hoy(); const y = base.getFullYear(), m = base.getMonth();
   const ses = S.sesiones.filter(conRegistro);
@@ -367,70 +429,62 @@ function vDiario() {
   }
   const lunes = L.iso(L.lunesDe(hoy())); const semana = new Set(ses.filter(s => s.fecha >= lunes && s.fecha <= hoyIso).map(s => s.fecha + s.dia)).size;
   const delMes = ses.filter(s => s.fecha.slice(0, 7) === L.iso(primero).slice(0, 7)).sort((a, b) => a.fecha < b.fecha ? 1 : -1);
-  const titulo = primero.toLocaleDateString('es', { month: 'long', year: 'numeric' }).toUpperCase();
-  return `<div class="pant"><header class="top"><div class="mini">TU REGISTRO DE CADA DÍA</div><h1 class="h1">DIARIO</h1></header>
-  <div class="stats s3"><div class="card"><div class="mini">SEMANA</div><div class="big">${semana}<small> / 5</small></div></div>
+  const titulo = primero.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+  return `<div class="stats s3"><div class="card"><div class="mini">SEMANA</div><div class="big">${semana}<small> / 5</small></div></div>
     <div class="card"><div class="mini">RACHA</div><div class="big">${L.rachaSemanas(hoy(), S.sesiones)}<small> sem</small></div></div>
     <div class="card"><div class="mini">TOTAL</div><div class="big">${new Set(ses.map(s => s.fecha + s.dia)).size}</div></div></div>
-  <div class="card cal"><div class="row-b"><button class="chip" data-a="mes" data-x="-1" aria-label="Mes anterior">‹</button><div class="h3">${esc(titulo)}</div><button class="chip" data-a="mes" data-x="1" aria-label="Mes siguiente">›</button></div>
-    <div class="cal-g">${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(x => `<span class="cd cab">${x}</span>`).join('')}${celdas}</div>
+  <div class="card cal"><div class="row-b"><button class="chip" data-a="mes" data-x="-1" aria-label="Mes anterior">‹</button><div class="h3">${esc(titulo.charAt(0).toUpperCase() + titulo.slice(1))}</div><button class="chip" data-a="mes" data-x="1" aria-label="Mes siguiente">›</button></div>
+    <div class="cal-g">${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(x => `<span class="cd cab">${x}</span>`).join('')}${celdas}</div>
     <div class="ley"><span><i class="pt hecho"></i>Terminado</span><span><i class="pt parcial"></i>A medias</span></div></div>
-  <section class="sec"><div class="sec-h"><span class="bar b-ss"></span><span class="sec-t">ENTRENAMIENTOS · ${delMes.length}</span></div><div class="sec-b">
-  ${delMes.length ? delMes.map(s => { const rs = L.resumenSesion(s); return `<button class="item btn-item" data-a="verDia" data-x="${s.fecha}|${s.dia}"><div><div class="it-n">${esc(L.DIAS[s.dia].nombre)}</div><div class="it-d">${esc(fechaLarga(L.parseIso(s.fecha)))} · ${rs.series} series · ${rs.volumen.toLocaleString('es')} kg${rs.minutos != null ? ' · ' + rs.minutos + ' min' : ''}</div></div><span class="st ${s.terminada ? 'ok' : ''}">${rs.records.length ? 'RÉCORD' : s.terminada ? 'HECHO' : 'A MEDIAS'}</span></button>`; }).join('') : '<p class="sub">Aún no hay entrenamientos este mes. Cada sesión que hagas queda guardada aquí.</p>'}</div></section>
-  <div class="espacio"></div></div>`;
+  <div class="card lista"><div class="mini">ENTRENAMIENTOS · ${delMes.length}</div>
+  ${delMes.length ? delMes.map(s => { const rs = L.resumenSesion(s); return `<button class="item btn-item" data-a="verDia" data-x="${s.fecha}|${s.dia}"><div><div class="it-n">${esc(L.DIAS[s.dia].nombre)}</div><div class="it-d">${esc(fechaLarga(L.parseIso(s.fecha)))} · ${rs.series} series${rs.minutos != null ? ' · ' + rs.minutos + ' min' : ''}</div></div><span class="st ${s.terminada ? 'ok' : ''}">${rs.records.length ? 'RÉCORD' : s.terminada ? 'HECHO' : 'A MEDIAS'}</span></button>`; }).join('') : '<p class="sub">Aún no hay entrenamientos este mes. Cada sesión que hagas queda guardada aquí.</p>'}</div>`;
 }
 function vDiaDetalle() {
   const [f, d] = S.diaSel.split('|'); const ses = sesionDe(f, d);
-  if (!ses) { S.diaSel = null; return vDiario(); }
+  if (!ses) { S.diaSel = null; return vProgreso(); }
   const otras = S.sesiones.filter(s => s.fecha === f && s !== ses && conRegistro(s));
-  return `<div class="pant"><header class="top"><button class="chip" data-a="verDia" data-x="">‹ DIARIO</button>
-    <div class="mini" style="margin-top:12px">${esc(fechaLarga(L.parseIso(f)).toUpperCase())} · CICLO ${ses.ciclo || 1} · SEMANA ${ses.semana || 1}${ses.datos.descarga ? ' · DESCARGA' : ''}</div><h1 class="h1">${esc(L.DIAS[d].nombre.toUpperCase())}</h1></header>
+  return `<div class="pant"><header class="top"><button class="chip atras" data-a="verDia" data-x="">‹ Volver</button>
+    <div class="mini">${esc(fechaLarga(L.parseIso(f)).toUpperCase())} · CICLO ${ses.ciclo || 1} · SEMANA ${ses.semana || 1}${ses.datos.descarga ? ' · DESCARGA' : ''}</div><h1 class="h1">${esc(L.DIAS[d].nombre)}</h1></header>
   ${statsSesion(ses)}
-  <section class="sec"><div class="sec-h"><span class="bar b-principal"></span><span class="sec-t">EJERCICIOS</span></div><div class="sec-b">${filasSesion(ses)}</div></section>
-  ${ses.nota ? `<div class="card"><div class="h3">NOTA</div><p class="sub">${esc(ses.nota)}</p></div>` : ''}
-  ${otras.map(o => `<button class="btn2 pad-b" data-a="verDia" data-x="${o.fecha}|${o.dia}">VER TAMBIÉN ${esc(L.DIAS[o.dia].nombre.toUpperCase())}</button>`).join('')}
+  <div class="card lista"><div class="mini">EJERCICIOS</div>${filasSesion(ses)}</div>
+  ${ses.nota ? `<div class="card"><div class="h3">Nota</div><p class="sub">${esc(ses.nota)}</p></div>` : ''}
+  ${otras.map(o => `<button class="btn2 pad-b" data-a="verDia" data-x="${o.fecha}|${o.dia}">Ver también ${esc(L.DIAS[o.dia].nombre)}</button>`).join('')}
   <div class="espacio"></div></div>`;
 }
-
-// ---------------- progreso, cuerpo, ajustes ----------------
-function vProgreso() {
+function vPesos() {
   const conDatos = Object.keys(L.EJ).filter(k => L.EJ[k].carga !== 'tiempo' && historial(k).some(h => h.w != null));
   const k = S.progEj && conDatos.includes(S.progEj) ? S.progEj : conDatos[0];
-  let graf = '<p class="sub pad">Cuando termines tus primeras sesiones, aquí verás cómo sube cada peso.</p>';
-  if (k) {
-    const h = historial(k).filter(x => x.w != null && !x.descarga).slice(-12);
-    const ws = h.map(x => L.aKg(x.w, x.u)); const min = Math.min(...ws); const max = Math.max(...ws); const W = 330, H = 140;
-    const xs = i => 16 + (h.length === 1 ? (W - 32) / 2 : i * (W - 32) / (h.length - 1)); const ys = v => max === min ? H / 2 : 16 + (H - 32) * (1 - (v - min) / (max - min));
-    const pts = h.map((x, i) => `${xs(i).toFixed(1)},${ys(ws[i]).toFixed(1)}`).join(' ');
-    const ult = h[h.length - 1]; const pri = h[0];
-    graf = `<div class="card"><div class="row-b"><div><div class="mini">PESO ACTUAL</div><div class="big">${ult.w} <small>${esc(ult.u)}</small></div></div><span class="badge ${ult.w > pri.w ? 'ok' : ''}">${ult.w > pri.w ? '+' + Math.round((ult.w - pri.w) * 100) / 100 + ' ' + esc(ult.u) : 'Sin cambio'}</span></div>
-      <svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peso de ${esc(L.EJ[k].n)} por sesión"><polyline points="${pts}"/>${h.map((x, i) => `<circle cx="${xs(i).toFixed(1)}" cy="${ys(ws[i]).toFixed(1)}" r="4"/>`).join('')}</svg>
-      <div class="hist">${h.slice().reverse().slice(0, 6).map(x => `<div class="item"><span>${esc(x.w + ' ' + x.u)}</span><span class="it-d">${esc((x.reps || []).join(' · '))}</span></div>`).join('')}</div></div>`;
-  }
-  return `<div class="pant"><header class="top"><h1 class="h1">PROGRESO</h1></header>
-  ${conDatos.length ? `<div class="chips pad">${conDatos.map(x => `<button class="chip${x === k ? ' on' : ''}" data-a="progEj" data-x="${x}">${esc(L.EJ[x].n)}</button>`).join('')}</div>` : ''}${graf}<div class="espacio"></div></div>`;
+  if (!k) return '<div class="card"><p class="sub">Cuando termines tus primeras sesiones, aquí verás cómo sube cada peso.</p></div>';
+  const h = historial(k).filter(x => x.w != null && !x.descarga).slice(-12);
+  if (!h.length) return '';
+  const ws = h.map(x => L.aKg(x.w, x.u)); const min = Math.min(...ws); const max = Math.max(...ws); const W = 330, H = 140;
+  const xs = i => 16 + (h.length === 1 ? (W - 32) / 2 : i * (W - 32) / (h.length - 1)); const ys = v => max === min ? H / 2 : 16 + (H - 32) * (1 - (v - min) / (max - min));
+  const pts = h.map((x, i) => `${xs(i).toFixed(1)},${ys(ws[i]).toFixed(1)}`).join(' ');
+  const ult = h[h.length - 1]; const pri = h[0];
+  return `<div class="chips pad">${conDatos.map(x => `<button class="chip${x === k ? ' on' : ''}" data-a="progEj" data-x="${x}">${esc(L.EJ[x].n)}</button>`).join('')}</div>
+  <div class="card"><div class="row-b"><div><div class="mini">PESO ACTUAL</div><div class="big">${ult.w} <small>${esc(ult.u)}</small></div></div><span class="badge ${ult.w > pri.w ? 'ok' : ''}">${ult.w > pri.w ? '+' + Math.round((ult.w - pri.w) * 100) / 100 + ' ' + esc(ult.u) : 'Sin cambio'}</span></div>
+    <svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peso de ${esc(L.EJ[k].n)} por sesión"><polyline points="${pts}"/>${h.map((x, i) => `<circle cx="${xs(i).toFixed(1)}" cy="${ys(ws[i]).toFixed(1)}" r="4"/>`).join('')}</svg>
+    <div class="hist">${h.slice().reverse().slice(0, 6).map(x => `<div class="item"><span>${esc(x.w + ' ' + x.u)}</span><span class="it-d">${esc((x.reps || []).join(' · '))}</span></div>`).join('')}</div></div>`;
 }
-function vCuerpo() {
-  const m = S.medidas;
-  return `<div class="pant"><header class="top"><div class="mini">OPCIONAL · SOLO CUANDO QUIERAS</div><h1 class="h1">MI CUERPO</h1></header>
-  <div class="card"><div class="grid2">
+
+// ---------------- perfil (mi cuerpo + ajustes) ----------------
+function vPerfil() {
+  const m = S.medidas; const i = info();
+  const enApp = (() => { try { return globalThis.matchMedia && matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; } })();
+  return `<div class="pant"><header class="top"><h1 class="h1">Perfil</h1></header>
+  <div class="card"><div class="h3">Mi cuerpo</div><p class="sub">Opcional. Anota solo cuando quieras.</p><div class="grid2 mt">
     <label><span class="lbl">PESO (KG)</span><input id="m-peso" class="inp" inputmode="decimal"></label>
     <label><span class="lbl">CADERA (CM)</span><input id="m-cadera" class="inp" inputmode="decimal"></label>
     <label><span class="lbl">CINTURA (CM)</span><input id="m-cintura" class="inp" inputmode="decimal"></label>
     <label><span class="lbl">MUSLO (CM)</span><input id="m-muslo" class="inp" inputmode="decimal"></label></div>
-    <button class="cta sm" data-a="medida">GUARDAR MEDIDA</button>${S.aviso ? `<p class="nota">${esc(S.aviso)}</p>` : ''}</div>
-  <section class="sec"><div class="sec-h"><span class="bar b-final"></span><span class="sec-t">HISTORIAL · ${m.length}</span></div><div class="sec-b">
-  ${m.length ? m.map(x => `<div class="item"><span>${esc(x.fecha)}</span><span class="it-d">${[x.peso_kg != null ? x.peso_kg + ' kg' : '', x.cadera_cm != null ? 'cadera ' + x.cadera_cm : '', x.cintura_cm != null ? 'cintura ' + x.cintura_cm : '', x.muslo_cm != null ? 'muslo ' + x.muslo_cm : ''].filter(Boolean).join(' · ')}</span></div>`).join('') : '<p class="sub">Sin medidas aún. Sin recordatorios: anota cuando quieras.</p>'}</div></section><div class="espacio"></div></div>`;
+    <button class="cta sm" data-a="medida">Guardar medida</button>${S.aviso ? `<p class="nota">${esc(S.aviso)}</p>` : ''}
+    ${m.length ? `<div class="hist">${m.slice(0, 8).map(x => `<div class="item"><span>${esc(x.fecha)}</span><span class="it-d">${[x.peso_kg != null ? x.peso_kg + ' kg' : '', x.cadera_cm != null ? 'cadera ' + x.cadera_cm : '', x.cintura_cm != null ? 'cintura ' + x.cintura_cm : '', x.muslo_cm != null ? 'muslo ' + x.muslo_cm : ''].filter(Boolean).join(' · ')}</span></div>`).join('')}</div>` : ''}</div>
+  ${enApp ? '' : `<div class="card"><div class="h3">Acceso directo</div><p class="sub">${S.instalable ? 'Instala el Entrenador como app aparte de Aluminio.' : 'En Chrome: menú ⋮ → «Agregar a la pantalla principal» o «Instalar app». En iPhone: Compartir → «Agregar a inicio».'}</p>${S.instalable ? '<button class="btn2 full" data-a="instalar">Instalar el Entrenador</button>' : ''}</div>`}
+  <div class="card"><div class="h3">Ciclo</div><p class="sub">Ciclo ${i.ciclo}, semana ${i.semana} de 6. Empezó el ${esc(S.perfil.inicio || '—')}.</p><button class="btn2 full" data-a="hoja" data-x="reiniciar">Empezar ciclo nuevo desde esta semana</button></div>
+  <div class="card"><div class="h3">Abducción</div><p class="sub">La máquina combinada está ${S.perfil.abdMaquina ? 'disponible' : 'dañada: se usa la polea'}.</p><button class="btn2 full" data-a="abd">${S.perfil.abdMaquina ? 'Marcar como dañada' : 'Ya la repararon'}</button></div>
+  <div class="card"><div class="h3">Sesión</div><p class="sub">${API.pendientes(store) ? 'Hay cambios por subir. No cierres sesión sin internet.' : 'Todo guardado en la nube.'}</p><button class="btn2 full" data-a="salir">Cerrar sesión en este teléfono</button></div>
+  <p class="nota pad">Entrenador · versión 2.0</p><div class="espacio"></div></div>`;
 }
-function vAjustes() {
-  const i = info();
-  return `<div class="pant"><header class="top"><h1 class="h1">AJUSTES</h1></header>
-  <div class="card"><div class="h3">CICLO</div><p class="sub">Ciclo ${i.ciclo}, semana ${i.semana} de 6. Empezó el ${esc(S.perfil.inicio || '—')}.</p><button class="btn2" data-a="hoja" data-x="reiniciar">EMPEZAR CICLO NUEVO DESDE ESTA SEMANA</button></div>
-  <div class="card"><div class="h3">ABDUCCIÓN</div><p class="sub">La máquina combinada está ${S.perfil.abdMaquina ? 'disponible' : 'dañada: se usa la polea'}.</p><button class="btn2" data-a="abd">${S.perfil.abdMaquina ? 'MARCAR COMO DAÑADA' : 'YA LA REPARARON'}</button></div>
-  <div class="card"><div class="h3">SESIÓN</div><p class="sub">${API.pendientes(store) ? 'Hay cambios por subir. No cierres sesión sin internet.' : 'Todo guardado en la nube.'}</p><button class="btn2" data-a="salir">CERRAR SESIÓN EN ESTE TELÉFONO</button></div>
-  <p class="nota pad">Entrenador · versión 1.0</p><div class="espacio"></div></div>`;
-}
-
 // ---------------- hojas ----------------
 function vHoja() {
   const h = S.hoja; let t = '', body = '';
@@ -453,7 +507,7 @@ function vHoja() {
     const pend = pl.faltas.length ? pl.faltas : L.PRIORIDAD.filter(d => !hechos.has(d));
     body = `<p class="sub">Hoy es tu día de descanso. Si igual quieres entrenar, elige la rutina.${pend.length ? ' Te recomiendo la primera: es la que más te falta esta semana.' : ''}</p>` +
       ['lun', 'mar', 'mie', 'vie', 'sab'].sort((a, b) => (pend.includes(a) ? pend.indexOf(a) : 9) - (pend.includes(b) ? pend.indexOf(b) : 9)).map(d =>
-        `<button class="opt" data-a="hacerHoy" data-x="${d}"><b>${esc(L.DIAS[d].nombre.toUpperCase())}</b><span>${hechos.has(d) ? 'Ya la hiciste esta semana' : L.RUTINA[d].reduce((a, p) => a + p.ex.length, 0) + ' ejercicios'}</span></button>`).join('');
+        `<button class="opt" data-a="hacerHoy" data-x="${d}"><b>${esc(L.DIAS[d].nombre)}</b><span>${hechos.has(d) ? 'Ya la hiciste esta semana' : L.RUTINA[d].reduce((a, p) => a + p.ex.length, 0) + ' ejercicios'}</span></button>`).join('');
   }
   if (h === 'reiniciar') { t = 'CICLO NUEVO'; body = `<p class="txt">El ciclo vuelve a la semana 1 desde este lunes. Tus pesos e historial se mantienen.</p><button class="cta" data-a="reiniciar">SÍ, EMPEZAR CICLO NUEVO</button>`; }
   return `<div class="velo" data-a="cerrar"></div><div class="hoja" role="dialog" aria-label="${esc(t)}"><span class="asa"></span><div class="h2">${esc(t)}</div>${body}<button class="btn2 full" data-a="cerrar">CERRAR</button></div>`;
@@ -494,13 +548,16 @@ const ACC = {
   },
   verDia(x) { S.diaSel = x || null; render(); },
   mes(x) { const b = S.mes ? L.parseIso(S.mes) : hoy(); S.mes = L.iso(new Date(b.getFullYear(), b.getMonth() + Number(x), 1)); render(); },
-  ir(x) { S.diaSel = null; if (x === 'resumen') { S.pantalla = 'resumen'; } else { S.pantalla = x; if (x === 'inicio') S.sel = L.weekday(hoy()); } S.hoja = null; S.aviso = ''; render(); },
-  dia(x) { S.sel = Number(x); S.vista = 'entreno'; render(); },
-  vista(x) { S.vista = x; render(); },
-  toggle(x) { S.abiertas[x] = x === 'cal' ? !S.abiertas[x] : S.abiertas[x] === false; render(); },
+  ir(x) { S.diaSel = null; if (x === 'resumen') { S.pantalla = 'resumen'; } else { S.pantalla = x; if (x === 'inicio' || x === 'rutina') S.sel = L.weekday(hoy()); } S.hoja = null; S.aviso = ''; render(); },
+  dia(x) { S.sel = Number(x); render(); },
+  verRutina(x) { S.sel = Number(x); S.pantalla = 'rutina'; S.hoja = null; render(); },
+  progTab(x) { S.progTab = x; render(); },
+  async instalar() { const ev = instalarEv; if (!ev) { S.pantalla = 'perfil'; render(); return; } instalarEv = null; S.instalable = false; try { ev.prompt(); await ev.userChoice; } catch (e) {} render(); },
+  ocultarInst() { S.instalOculto = true; try { store.setItem('gym_inst_oculto', '1'); } catch (e) {} render(); },
   falta(x, y) { const wk = L.iso(L.lunesDe(hoy())); S.perfil.decisiones = S.perfil.decisiones || {}; Object.keys(S.perfil.decisiones).forEach(k => { if (k < wk) delete S.perfil.decisiones[k]; }); S.perfil.decisiones[wk] = Object.assign({}, S.perfil.decisiones[wk], { [y]: x }); guardarPerfil(); render(); },
-  hacerHoy(x) { S.hoja = null; S.sel = L.weekday(hoy()); S.vista = 'entreno'; const ses = sesionHoy(true, x); ses.datos.elegida = true; ACC.empezar(); },
+  hacerHoy(x) { S.hoja = null; S.sel = L.weekday(hoy()); const ses = sesionHoy(true, x); ses.datos.elegida = true; ACC.empezar(); },
   empezar() {
+    if (plan().faltas.length) { render(); return; }
     const ses = sesionHoy(true); const dia = ses.dia;
     const p = ses.datos.orden.findIndex(j => !L.pasoHecho(L.RUTINA[dia][j], ses.datos, k => setsDe(k, ses)));
     if (p < 0) { S.pantalla = 'resumen'; render(); return; }
