@@ -1,7 +1,7 @@
 // Guarda la app en el teléfono para que abra rápido y funcione sin señal en el gimnasio.
 // Los datos se sincronizan con Supabase cuando vuelve la conexión.
-const VERSION = 'entrenador-v2';
-const ARCHIVOS = ['./', './index.html', './styles.css?v=2', './app.js?v=2', './logic.js?v=2', './api.js?v=2', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const VERSION = 'entrenador-v3';
+const ARCHIVOS = ['./', './index.html', './styles.css?v=3', './app.js?v=3', './logic.js?v=3', './api.js?v=3', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));

@@ -329,3 +329,40 @@ export function siguienteTurno(paso, ses, k, separado, setsDe) {
   if (!hecho(o, ses, setsDe(o))) return o === a ? 'a' : 'b';
   return k === a ? 'a' : 'b';
 }
+
+// ---------------- registro diario ----------------
+// Fuerza estimada (fórmula de Epley): sirve para comparar 60 kg × 10 con 65 kg × 8.
+export function e1rm(w, u, reps) { if (w == null || !reps) return 0; return aKg(w, u) * (1 + reps / 30); }
+export function mejorSerie(en) {
+  if (!en || en.w == null || !(en.reps || []).length) return 0;
+  return Math.max(...en.reps.map(r => e1rm(en.w, en.u, r)));
+}
+// ¿Esta entrada supera todo lo anterior? (con historial previo; la primera vez no cuenta como récord)
+export function esRecord(en, historial) {
+  if (!en || en.skip || en.swap || en.w == null) return false;
+  const prev = (historial || []).filter(h => !h.descarga).map(mejorSerie).filter(x => x > 0);
+  if (!prev.length) return false;
+  return mejorSerie(en) > Math.max(...prev) + 0.01;
+}
+// Kilos movidos en una entrada (peso × repeticiones de cada serie)
+export function volumen(en) { if (!en || en.skip || en.w == null) return 0; return Math.round(aKg(en.w, en.u) * (en.reps || []).reduce((a, b) => a + b, 0)); }
+export function resumenSesion(ses) {
+  const ex = Object.entries((ses && ses.datos && ses.datos.ex) || {});
+  const hechos = ex.filter(([, en]) => !en.skip && (en.reps || []).length);
+  const t0 = ses && ses.datos && ses.datos.t0, t1 = ses && ses.datos && ses.datos.t1;
+  return {
+    ejercicios: hechos.length,
+    series: hechos.reduce((a, [, en]) => a + en.reps.length, 0),
+    volumen: hechos.reduce((a, [, en]) => a + volumen(en), 0),
+    records: hechos.filter(([, en]) => en.pr).map(([k]) => k),
+    minutos: t0 && t1 && t1 > t0 ? Math.round((t1 - t0) / 60000) : null
+  };
+}
+// Días seguidos de semanas cumplidas no: racha = semanas consecutivas (hasta la actual) con al menos 1 sesión
+export function rachaSemanas(hoy, sesiones) {
+  const sem = new Set((sesiones || []).filter(s => s.datos && Object.values(s.datos.ex || {}).some(e => (e.reps || []).length)).map(s => iso(lunesDe(parseIso(s.fecha)))));
+  let l = lunesDe(hoy); let n = 0;
+  if (!sem.has(iso(l))) l = addDays(l, -7);
+  while (sem.has(iso(l))) { n++; l = addDays(l, -7); }
+  return n;
+}
