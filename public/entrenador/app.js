@@ -1,5 +1,5 @@
-import * as L from './logic.js?v=5';
-import * as API from './api.js?v=5';
+import * as L from './logic.js?v=6';
+import * as API from './api.js?v=6';
 
 const store = globalThis.localStorage;
 const $app = () => document.getElementById('app');
@@ -213,8 +213,8 @@ function vInicio() {
   // Tarjeta grande: el entrenamiento de hoy
   let hero;
   if (!dHoy) {
-    hero = `<div class="hero descansa"><div class="hero-l">HOY</div><div class="hero-t">Descanso</div><div class="hero-s">${hoyWd === 4 ? 'Si quieres, camina suave 20–30 min.' : 'Duerme bien y come suficiente proteína.'}</div>
-      <button class="btn2 hero-b2" data-a="hoja" data-x="elegir">Entrenar de todas formas</button></div>`;
+    hero = `<div class="hero descansa"><div class="hero-l">HOY</div><div class="hero-t">Descanso</div><div class="hero-s">${hoyWd === 4 ? 'Si quieres, camina suave 20–30 min.' : 'Domingo de descanso. Duerme bien y come suficiente proteína.'}</div>
+      ${hoyWd === 7 ? '' : '<button class="btn2 hero-b2" data-a="hoja" data-x="elegir">Entrenar de todas formas</button>'}</div>`;
   } else if (ses && hechosN === total) {
     hero = `<button class="hero hecho" data-a="ir" data-x="resumen"><div class="hero-l">HOY · TERMINADO</div><div class="hero-t">${esc(L.DIAS[dHoy].nombre)}</div><div class="hero-s">Toca para ver tu resumen</div><span class="play ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span></button>`;
   } else {
@@ -267,7 +267,7 @@ function vFalta() {
     <p class="sub">No hiciste <b>${esc(nombre)}</b>. Antes de seguir, dime qué hacemos con la semana.</p>
     ${puede ? `<button class="opt prin" data-a="falta" data-x="mover" data-y="${falta}"><b>Cambiar la rutina: hacerlo el ${esc(L.NOMBRE_DIA[dest])}</b><span>${esc(nombre)} pasa a tu día libre del ${esc(L.NOMBRE_DIA[dest])}.</span></button>` : ''}
     <button class="opt" data-a="falta" data-x="seguir" data-y="${falta}"><b>No cambiar nada</b><span>${esc(nombre)} se salta esta semana y sigues normal.</span></button>
-    ${puede ? '' : `<p class="nota">No se puede pasar a otro día: el ${esc(L.NOMBRE_DIA[dest] || 'día libre')} ya pasó o está ocupado.</p>`}
+    ${puede ? '' : `<p class="nota">${dest ? 'No se puede pasar al ' + esc(L.NOMBRE_DIA[dest]) + ': ya pasó o está ocupado.' : 'El domingo es tu descanso, así que no se pasa a otro día.'}</p>`}
   </div>`;
 }
 
@@ -283,7 +283,7 @@ function vRutina() {
   let cuerpo = '', cta = '';
   if (!dSel) {
     cuerpo = `<div class="card"><div class="h2">Descanso</div><p class="sub">${S.sel === 4 ? 'Opcional: caminata suave de 20–30 min.' : 'Descanso total. Duerme bien y come suficiente proteína.'}</p></div>`;
-    if (esHoy) cta = `<button class="cta" data-a="hoja" data-x="elegir">Entrenar de todas formas</button>`;
+    if (esHoy && S.sel !== 7) cta = `<button class="cta" data-a="hoja" data-x="elegir">Entrenar de todas formas</button>`;
   } else {
     const primer = ses && esHoy ? (ses.datos.orden || []).find(j => !L.pasoHecho(L.RUTINA[dSel][j], ses.datos, k => setsDe(k, ses))) : (esHoy ? 0 : -1);
     const desc = esHoy && i.descarga;
@@ -558,6 +558,7 @@ const ACC = {
   hacerHoy(x) { S.hoja = null; S.sel = L.weekday(hoy()); const ses = sesionHoy(true, x); ses.datos.elegida = true; ACC.empezar(); },
   empezar() {
     if (plan().faltas.length) { render(); return; }
+    if (L.weekday(hoy()) === 7 && !S.sesiones.some(s => s.fecha === L.iso(hoy()) && s.datos && s.datos.t0)) { render(); return; } // domingo: descanso
     const ses = sesionHoy(true); const dia = ses.dia;
     const p = ses.datos.orden.findIndex(j => !L.pasoHecho(L.RUTINA[dia][j], ses.datos, k => setsDe(k, ses)));
     if (p < 0) { S.pantalla = 'resumen'; render(); return; }

@@ -12,12 +12,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <main id="app" aria-live="polite"></main>
 <script type="module">
-import { iniciar, conectar } from './app.js?v=5';
+import { iniciar, conectar } from './app.js?v=6';
 conectar(document.getElementById('app'));
 iniciar();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

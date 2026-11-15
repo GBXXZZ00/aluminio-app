@@ -303,8 +303,8 @@ export function planSemana(hoy, sesiones, decisiones, desde) {
   });
   return { semanaKey: wk, faltas, dias };
 }
-// Lunes–miércoles se recupera el jueves; viernes–sábado, el domingo
-export function destino(wd) { if (wd <= 3) return 4; if (wd === 5 || wd === 6) return 7; return null; }
+// Lunes–miércoles se recupera el jueves. El domingo es SIEMPRE descanso: viernes y sábado no se mueven.
+export function destino(wd) { if (wd <= 3) return 4; return null; }
 export function puedeMover(hoy, dia, decisiones) {
   const wk = iso(lunesDe(hoy)); const dec = (decisiones && decisiones[wk]) || {};
   const dest = destino(DIAS[dia].wd); if (!dest) return false;
