@@ -1,17 +1,22 @@
 // Lógica pura del entrenador: rutina, semanas, progresión, descarga, faltas y discos.
 // No toca el DOM ni la red, así se puede probar sola.
 
+// Horario nuevo desde el lunes 23/11/2026: los días de pierna caen cuando esas máquinas están libres
+// (en el gimnasio todos hacen pierna lunes y miércoles, y arriba martes y viernes).
+// Se mantienen las mismas claves (lun, mar…) para no perder el historial ni los pesos.
+const HORARIO_NUEVO = new Date() >= new Date(2026, 10, 23);
+const WD = HORARIO_NUEVO ? { lun: 2, mar: 1, mie: 5, vie: 3, sab: 6 } : { lun: 1, mar: 2, mie: 3, vie: 5, sab: 6 };
+const LETRA_DIA = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 export const DIAS = {
-  lun: { d: 'Lun', nombre: 'Glúteo + Isquios', wd: 1 },
-  mar: { d: 'Mar', nombre: 'Torso A', wd: 2 },
-  mie: { d: 'Mié', nombre: 'Pierna B', wd: 3 },
-  vie: { d: 'Vie', nombre: 'Torso B', wd: 5 },
-  sab: { d: 'Sáb', nombre: 'Glúteo C + Cuádriceps', wd: 6 }
+  lun: { d: LETRA_DIA[WD.lun], nombre: 'Glúteo + Isquios', wd: WD.lun },
+  mar: { d: LETRA_DIA[WD.mar], nombre: 'Torso A', wd: WD.mar },
+  mie: { d: LETRA_DIA[WD.mie], nombre: 'Pierna B', wd: WD.mie },
+  vie: { d: LETRA_DIA[WD.vie], nombre: 'Torso B', wd: WD.vie },
+  sab: { d: LETRA_DIA[WD.sab], nombre: HORARIO_NUEVO ? 'Glúteo C + Femoral' : 'Glúteo C + Cuádriceps', wd: WD.sab }
 };
-export const SEMANA = [
-  { wd: 1, key: 'lun' }, { wd: 2, key: 'mar' }, { wd: 3, key: 'mie' }, { wd: 4, key: null, d: 'Jue' },
-  { wd: 5, key: 'vie' }, { wd: 6, key: 'sab' }, { wd: 7, key: null, d: 'Dom' }
-];
+const clave = wd => Object.keys(WD).find(k => WD[k] === wd) || null;
+export const SEMANA = [1, 2, 3, 4, 5, 6, 7].map(wd => clave(wd) ? { wd, key: clave(wd) } : { wd, key: null, d: LETRA_DIA[wd] });
+export const ORDEN_DIAS = SEMANA.filter(x => x.key).map(x => x.key);
 export const NOMBRE_DIA = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
 const A = (n, d) => ({ n, d });
@@ -38,7 +43,7 @@ export const EJ = {
     how: 'De pie, codos un poco doblados. Sube los brazos a los lados hasta la altura del hombro, sin impulso, y baja en 2 segundos.',
     soft: A('Laterales en polea, más liviano', 'Tensión suave y constante'),
     alts: [A('Laterales en polea', 'Otra estación'), A('Laterales en máquina', 'Si hay máquina libre'), A('Laterales sentado con mancuernas', 'Sin impulso')] },
-  pa_lun: { n: 'Pantorrilla en prensa', sets: 3, lo: 10, hi: 12, rest: 75, rir: '1', carga: 'discos', u: 'kg',
+  pa_lun: { n: 'Pantorrilla en prensa', sets: 3, lo: 10, hi: 12, rest: 75, ssRest: 60, rir: '1', carga: 'discos', u: 'kg',
     how: 'Punta de los pies en el borde de la plataforma. Baja el talón hasta estirar, aguanta 2 segundos y sube lo más alto que puedas.',
     soft: A('Pantorrilla sentado', 'Menos carga en la rodilla'),
     alts: [A('Pantorrilla de pie en máquina', 'Mismo músculo'), A('Pantorrilla en Smith sobre disco', 'Fácil de montar'), A('Pantorrilla a una pierna con mancuerna', 'Si todo está lleno')] },
@@ -127,7 +132,7 @@ export const EJ = {
     how: 'Cuélgate de la barra con los brazos estirados y el cuerpo relajado. Solo si te alivia la espalda.', soft: A('Saltarlo hoy', 'Es opcional'), alts: [] },
 
   ht_sab: { n: 'Hip Thrust en máquina (volumen)', sets: 3, lo: 10, hi: 12, rest: 120, rir: '2', carga: 'discos', u: 'lb',
-    how: 'Menos peso que el lunes y más repeticiones. Aprieta 2 segundos arriba.',
+    how: 'Menos peso que ' + (HORARIO_NUEVO ? 'el martes' : 'el lunes') + ' y más repeticiones. Aprieta 2 segundos arriba.',
     soft: A('Puente de glúteo en Smith, más liviano', 'Recorrido corto'),
     alts: [A('Hip thrust con barra en banco', 'Otra estación'), A('Puente de glúteo en Smith', 'Fácil de montar'), A('Patada de glúteo en polea', 'Si todo está lleno')] },
   pt_sab: { n: 'Pull-through en polea', sets: 3, lo: 12, hi: 15, rest: 90, rir: '1', carga: 'polea', u: 'kg',
@@ -146,7 +151,7 @@ export const EJ = {
     how: 'De pie, tobillera en la polea baja. Abre la pierna hacia el lado sin girar la cadera. Si la máquina combinada funciona, úsala con el torso inclinado adelante.',
     soft: A('Abducción en polea, más liviana', 'Recorrido corto'),
     alts: [A('Abducción en máquina combinada', 'Cuando la reparen'), A('Patada lateral en polea', 'Otra variante'), A('Abducción con banda sentado', 'Si todo está lleno')] },
-  ext_sab: { n: 'Extensión de cuádriceps (recorrido corto)', sets: 3, lo: 12, hi: 15, rest: 75, ssRest: 60, rir: '1', carga: 'pila', u: 'kg',
+  ext_sab: { n: 'Extensión de cuádriceps (recorrido corto)', sets: 3, lo: 12, hi: 15, rest: 75, ssRest: HORARIO_NUEVO ? 30 : 60, rir: '1', carga: 'pila', u: 'kg',
     how: 'De 90° a unos 30°, sin estirar del todo. Peso moderado.',
     soft: A('Extensión con menos peso y pausa', 'Cuida la rótula'),
     alts: [A('Extensión a una pierna', 'Misma máquina'), A('Prensa con pies bajos, ligera', 'Otra máquina'), A('Sentadilla sissy asistida', 'Si todo está lleno')] }
@@ -156,7 +161,8 @@ export const EJ = {
 export const RUTINA = {
   lun: [
     { sec: 'principal', ex: ['ht_lun'] }, { sec: 'principal', ex: ['pt_lun'] }, { sec: 'principal', ex: ['pr_lun'] },
-    { sec: 'ss', ex: ['cf_lun', 'lat_lun'], label: 'A' }, { sec: 'final', ex: ['pa_lun'] }
+    { sec: 'ss', ex: ['cf_lun', 'lat_lun'], label: 'A' },
+    ...(HORARIO_NUEVO ? [{ sec: 'ss', ex: ['ext_sab', 'pa_lun'], label: 'B' }] : [{ sec: 'final', ex: ['pa_lun'] }])
   ],
   mar: [
     { sec: 'ss', ex: ['pim_mar', 'jal_mar'], label: 'A' }, { sec: 'ss', ex: ['rem_mar', 'cru_mar'], label: 'B' },
@@ -172,7 +178,9 @@ export const RUTINA = {
   ],
   sab: [
     { sec: 'principal', ex: ['ht_sab'] }, { sec: 'principal', ex: ['pt_sab'] },
-    { sec: 'ss', ex: ['cf_sab', 'lat_sab'], label: 'A' }, { sec: 'ss', ex: ['abd_sab', 'ext_sab'], label: 'B' }
+    { sec: 'ss', ex: ['cf_sab', 'lat_sab'], label: 'A' },
+    // Desde el horario nuevo la extensión pasa al martes (el viernes ya es día de cuádriceps)
+    HORARIO_NUEVO ? { sec: 'final', ex: ['abd_sab'] } : { sec: 'ss', ex: ['abd_sab', 'ext_sab'], label: 'B' }
   ]
 };
 export const CALENTAMIENTO = [

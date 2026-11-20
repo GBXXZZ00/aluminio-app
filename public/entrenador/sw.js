@@ -1,7 +1,7 @@
 // Guarda la app en el teléfono para que abra rápido y funcione sin señal en el gimnasio.
 // Los datos se sincronizan con Supabase cuando vuelve la conexión.
-const VERSION = 'entrenador-v6';
-const ARCHIVOS = ['./', './index.html', './styles.css?v=6', './app.js?v=6', './logic.js?v=6', './api.js?v=6', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './fonts/poppins-latin-400-normal.woff2', './fonts/poppins-latin-500-normal.woff2', './fonts/poppins-latin-600-normal.woff2', './fonts/poppins-latin-700-normal.woff2', './fonts/poppins-latin-800-normal.woff2'];
+const VERSION = 'entrenador-v7';
+const ARCHIVOS = ['./', './index.html', './styles.css?v=7', './app.js?v=7', './logic.js?v=7', './api.js?v=7', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './fonts/poppins-latin-400-normal.woff2', './fonts/poppins-latin-500-normal.woff2', './fonts/poppins-latin-600-normal.woff2', './fonts/poppins-latin-700-normal.woff2', './fonts/poppins-latin-800-normal.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));

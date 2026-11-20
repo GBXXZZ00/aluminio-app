@@ -1,5 +1,5 @@
-import * as L from './logic.js?v=6';
-import * as API from './api.js?v=6';
+import * as L from './logic.js?v=7';
+import * as API from './api.js?v=7';
 
 const store = globalThis.localStorage;
 const $app = () => document.getElementById('app');
@@ -235,7 +235,7 @@ function vInicio() {
 
   // Siguiente entrenamiento
   const sig = pl.dias.find(x => x.wd > hoyWd && x.dia && x.estado !== 'hecho');
-  const sigDia = sig ? sig.dia : 'lun';
+  const sigDia = sig ? sig.dia : L.ORDEN_DIAS[0];
   const sigTxt = sig ? (sig.wd === hoyWd + 1 ? 'MAÑANA' : L.NOMBRE_DIA[sig.wd].toUpperCase()) : 'EL LUNES';
 
   const inst = S.instalable && !S.instalOculto ? `<div class="card inst"><div><div class="h3">Pon el Entrenador en tu pantalla</div><p class="sub">Se abre como app, aparte de Aluminio.</p></div><button class="chip on" data-a="instalar">Instalar</button><button class="x" data-a="ocultarInst" aria-label="Cerrar">×</button></div>` : '';
@@ -506,7 +506,7 @@ function vHoja() {
     t = 'ENTRENAR HOY'; const pl = plan(); const hechos = new Set(pl.dias.filter(x => x.estado === 'hecho' && x.dia).map(x => x.dia));
     const pend = pl.faltas.length ? pl.faltas : L.PRIORIDAD.filter(d => !hechos.has(d));
     body = `<p class="sub">Hoy es tu día de descanso. Si igual quieres entrenar, elige la rutina.${pend.length ? ' Te recomiendo la primera: es la que más te falta esta semana.' : ''}</p>` +
-      ['lun', 'mar', 'mie', 'vie', 'sab'].sort((a, b) => (pend.includes(a) ? pend.indexOf(a) : 9) - (pend.includes(b) ? pend.indexOf(b) : 9)).map(d =>
+      L.ORDEN_DIAS.slice().sort((a, b) => (pend.includes(a) ? pend.indexOf(a) : 9) - (pend.includes(b) ? pend.indexOf(b) : 9)).map(d =>
         `<button class="opt" data-a="hacerHoy" data-x="${d}"><b>${esc(L.DIAS[d].nombre)}</b><span>${hechos.has(d) ? 'Ya la hiciste esta semana' : L.RUTINA[d].reduce((a, p) => a + p.ex.length, 0) + ' ejercicios'}</span></button>`).join('');
   }
   if (h === 'reiniciar') { t = 'CICLO NUEVO'; body = `<p class="txt">El ciclo vuelve a la semana 1 desde este lunes. Tus pesos e historial se mantienen.</p><button class="cta" data-a="reiniciar">SÍ, EMPEZAR CICLO NUEVO</button>`; }
