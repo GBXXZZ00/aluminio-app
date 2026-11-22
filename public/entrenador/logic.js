@@ -1,10 +1,10 @@
 // Lógica pura del entrenador: rutina, semanas, progresión, descarga, faltas y discos.
 // No toca el DOM ni la red, así se puede probar sola.
 
-// Horario nuevo desde el lunes 23/11/2026: los días de pierna caen cuando esas máquinas están libres
-// (en el gimnasio todos hacen pierna lunes y miércoles, y arriba martes y viernes).
+// Horario nuevo (ya activo desde el domingo 22/11/2026, para verlo antes del lunes 23): los días de pierna
+// caen cuando esas máquinas están libres (en el gimnasio todos hacen pierna lunes y miércoles, y arriba martes y viernes).
 // Se mantienen las mismas claves (lun, mar…) para no perder el historial ni los pesos.
-const HORARIO_NUEVO = new Date() >= new Date(2026, 10, 23);
+const HORARIO_NUEVO = new Date() >= new Date(2026, 10, 22);
 const WD = HORARIO_NUEVO ? { lun: 2, mar: 1, mie: 5, vie: 3, sab: 6 } : { lun: 1, mar: 2, mie: 3, vie: 5, sab: 6 };
 const LETRA_DIA = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 export const DIAS = {
@@ -208,6 +208,28 @@ export function infoSemana(hoy, inicioIso) {
 }
 
 // ---------- pesos ----------
+// El mismo ejercicio sale en dos días con claves distintas (ej. curl femoral martes y sábado).
+// Si uno aún no tiene peso, se usa el del otro para no empezar en blanco. Cada uno sigue su propio progreso.
+export const GEMELO = {
+  cf_lun: 'cf_sab', cf_sab: 'cf_lun', pt_lun: 'pt_sab', pt_sab: 'pt_lun', lat_lun: 'lat_sab', lat_sab: 'lat_lun',
+  ext_mie: 'ext_sab', ext_sab: 'ext_mie', ht_lun: 'ht_sab', ht_sab: 'ht_lun', pr_lun: 'prm_mie', prm_mie: 'pr_lun',
+  jal_mar: 'jaln_vie', jaln_vie: 'jal_mar'
+};
+// Mismo ejercicio exacto (mismo peso sirve); los demás son parecidos: se sugiere un poco menos.
+const IGUAL = new Set(['cf_lun', 'cf_sab', 'pt_lun', 'pt_sab', 'lat_lun', 'lat_sab', 'ext_mie', 'ext_sab']);
+// Peso con el que arranca un ejercicio: el suyo; si no tiene, el de su gemelo; si no, el último que anotaste en una sesión.
+export function pesoInicial(k, perfilEx, sesiones) {
+  const e = EJ[k]; if (!e || e.carga === 'tiempo') return null;
+  const st = perfilEx && perfilEx[k]; if (st && st.w != null) return { w: st.w, u: st.u || e.u, propio: true };
+  const ultimo = kk => { const s = (sesiones || []).filter(x => x.datos && x.datos.ex && x.datos.ex[kk] && x.datos.ex[kk].w != null && !x.datos.ex[kk].swap && !x.datos.descarga).sort((a, b) => a.fecha < b.fecha ? 1 : -1)[0]; return s ? { w: s.datos.ex[kk].w, u: s.datos.ex[kk].u } : null; };
+  const pr = ultimo(k); if (pr) return { w: pr.w, u: pr.u || e.u, propio: true };
+  const g = GEMELO[k]; if (!g) return null;
+  const sg = (perfilEx && perfilEx[g] && perfilEx[g].w != null) ? perfilEx[g] : ultimo(g);
+  if (!sg || sg.w == null) return null;
+  const u = sg.u || EJ[g].u;
+  if (IGUAL.has(k)) return { w: sg.w, u, propio: false };
+  return { w: Math.max(0, Math.floor((sg.w * 0.9) / paso(e, u)) * paso(e, u)), u, propio: false };
+}
 export function paso(e, u) {
   u = u || e.u;
   if (e.carga === 'mancuernas') return u === 'lb' ? 5 : 1;

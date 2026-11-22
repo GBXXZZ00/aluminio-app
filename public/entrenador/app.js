@@ -1,5 +1,5 @@
-import * as L from './logic.js?v=7';
-import * as API from './api.js?v=7';
+import * as L from './logic.js?v=8';
+import * as API from './api.js?v=8';
 
 const store = globalThis.localStorage;
 const $app = () => document.getElementById('app');
@@ -45,8 +45,8 @@ function historial(k, excluir) {
 function estadoEj(k) { return S.perfil.ex[k] || null; }
 function entrada(ses, k) {
   if (!ses.datos.ex[k]) {
-    const e = L.EJ[k]; const st = estadoEj(k);
-    let w = st && st.w != null ? st.w : null; const u = (st && st.u) || e.u;
+    const e = L.EJ[k]; const st = estadoEj(k); const pi = L.pesoInicial(k, S.perfil.ex, S.sesiones);
+    let w = pi ? pi.w : null; const u = (pi && pi.u) || (st && st.u) || e.u;
     if (ses.datos.descarga && w != null && e.carga !== 'tiempo') w = L.pesoDescarga(e, w, u);
     ses.datos.ex[k] = { w: e.carga === 'tiempo' ? null : w, u, reps: [] };
   }
@@ -289,7 +289,7 @@ function vRutina() {
     const desc = esHoy && i.descarga;
     const lista = L.RUTINA[dSel].map((p, j) => {
       const done = ses && L.pasoHecho(p, ses.datos, k => setsDe(k, ses)); const now = esHoy && !done && j === primer;
-      const lineas = p.ex.map(k => { const e = L.EJ[k]; const st = estadoEj(k); const w = st && st.w != null && e.carga !== 'tiempo' ? ' · ' + (desc ? L.pesoDescarga(e, st.w, st.u) : st.w) + ' ' + st.u : '';
+      const lineas = p.ex.map(k => { const e = L.EJ[k]; const st = L.pesoInicial(k, S.perfil.ex, S.sesiones); const w = st && st.w != null && e.carga !== 'tiempo' ? ' · ' + (desc ? L.pesoDescarga(e, st.w, st.u) : st.w) + ' ' + st.u : '';
         return `<div class="paso-n">${esc(nombreEj(k, ses))}</div><div class="it-d">${L.seriesDe(e, desc)} × ${e.lo}–${e.hi}${e.carga === 'tiempo' ? ' s' : ''}${e.porPierna ? ' por pierna' : ''}${w}</div>`; }).join('');
       return `<div class="paso${done ? ' ok' : now ? ' now' : ''}"><span class="num-c">${done ? '✓' : j + 1}</span><div class="paso-b">${p.label ? `<div class="ss-tag">SUPERSERIE ${p.label}</div>` : ''}${lineas}</div></div>`;
     }).join('');
